@@ -21,6 +21,7 @@
     <module>modules/riemann</module>
     <module>modules/carbon</module>
     <module>modules/template</module>
+    <module>modules/snoop</module>
   </modules>
 
   <licenses>
@@ -73,6 +74,11 @@
       <dependency>
         <groupId>com.spotify.ffwd</groupId>
         <artifactId>ffwd-module-riemann</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.spotify.ffwd</groupId>
+        <artifactId>ffwd-module-snoop</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -203,8 +209,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.1</version>
         <configuration>
-          <source>1.7</source>
-          <target>1.7</target>
+          <source>1.8</source>
+          <target>1.8</target>
         </configuration>
       </plugin>
 

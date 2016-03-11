@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FFWD StateIndex</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="index.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <script src="vendor.js" type="text/javascript"></script>
+  <script src="app.js"></script>
+</head>
+
+<body ng-app="FFWDStateIndex" ng-cloak layout="column" layout-fill ng-controller="app">
+<ul class="chips">
+    <li ng-repeat="tag in data.metrics.commonTags" class="tag">{{tag}}</li>
+    <li ng-repeat="(key, value) in data.metrics.commonAttributes" class="attribute">{{key}}: {{value}}</li>
+</ul>
+<table>
+    <tbody>
+    <tr ng-repeat="(hashCode, datapoint) in data.metrics.datapoints">
+        <td>
+            <ul class="chips">
+                <li class="tag"
+                    ng-repeat="tag in datapoint.meta.identifyingTags">{{tag}}</li>
+                <li class="attribute"
+                    ng-repeat="key in datapoint.meta.identifyingKeys" ng-init="value=datapoint.meta.attributes[key]">{{key}}: {{value}}</li>
+            </ul>
+        </td>
+        <td>{{datapoint.values[0].time.toISOString()}}</td>
+        <td>{{datapoint.values[0].value}}</td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

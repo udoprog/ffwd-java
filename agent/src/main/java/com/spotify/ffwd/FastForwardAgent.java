@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.spotify.ffwd.snoop.SnoopOutputModule;
 import lombok.extern.slf4j.Slf4j;
 
 import com.spotify.ffwd.module.FastForwardModule;
@@ -50,6 +51,7 @@ public class FastForwardAgent {
         modules.add(com.spotify.ffwd.kafka.KafkaModule.class);
         modules.add(com.spotify.ffwd.riemann.RiemannModule.class);
         modules.add(com.spotify.ffwd.carbon.CarbonModule.class);
+        modules.add(com.spotify.ffwd.snoop.SnoopOutputModule.class);
         modules.add(com.spotify.ffwd.template.TemplateOutputModule.class);
 
         final AgentCore.Builder builder = AgentCore.builder().modules(modules);

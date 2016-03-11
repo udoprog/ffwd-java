@@ -2,3 +2,5 @@
 target
 *.class
 *.iml
+/modules/snoop/src/main/app/node_modules
+/modules/snoop/src/main/resources/com/spotify/ffwd/snoop/app
