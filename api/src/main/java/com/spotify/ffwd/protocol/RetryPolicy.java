@@ -20,8 +20,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.google.common.base.Optional;
 
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
@@ -50,8 +50,8 @@ public interface RetryPolicy {
         private final long value;
 
         @JsonCreator
-        public Constant(@JsonProperty("value") Long value) {
-            this.value = Optional.fromNullable(value).or(DEFAULT_VALUE);
+        public Constant(@JsonProperty("value") Optional<Long> value) {
+            this.value = value.orElse(DEFAULT_VALUE);
         }
 
         @Override
@@ -74,15 +74,17 @@ public interface RetryPolicy {
         private final int maxAttempt;
 
         @JsonCreator
-        public Exponential(@JsonProperty("initial") Long initial, @JsonProperty("max") Long max) {
-            this.initial = Optional.fromNullable(initial).or(DEFAULT_INITIAL);
-            this.max = Optional.fromNullable(max).or(DEFAULT_MAX);
+        public Exponential(
+            @JsonProperty("initial") Optional<Long> initial, @JsonProperty("max") Optional<Long> max
+        ) {
+            this.initial = initial.orElse(DEFAULT_INITIAL);
+            this.max = max.orElse(DEFAULT_MAX);
             this.maxAttempt =
                 new Double(Math.floor(Math.log(this.max / this.initial) / Math.log(2))).intValue();
         }
 
         public Exponential() {
-            this(null, null);
+            this(Optional.empty(), Optional.empty());
         }
 
         @Override
@@ -107,9 +109,11 @@ public interface RetryPolicy {
         private final int maxAttempt;
 
         @JsonCreator
-        public Linear(@JsonProperty("value") Long value, @JsonProperty("max") Long max) {
-            this.value = Optional.fromNullable(value).or(DEFAULT_VALUE);
-            this.max = Optional.fromNullable(max).or(DEFAULT_MAX);
+        public Linear(
+            @JsonProperty("value") Optional<Long> value, @JsonProperty("max") Optional<Long> max
+        ) {
+            this.value = value.orElse(DEFAULT_VALUE);
+            this.max = max.orElse(DEFAULT_MAX);
             this.maxAttempt = (int) ((this.max / this.value) - 1);
         }
 

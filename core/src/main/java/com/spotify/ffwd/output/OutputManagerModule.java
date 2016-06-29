@@ -17,28 +17,29 @@ package com.spotify.ffwd.output;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
-import com.google.inject.Provides;
-import com.google.inject.Scopes;
-import com.google.inject.Singleton;
-import com.google.inject.multibindings.Multibinder;
-import com.google.inject.name.Named;
-import com.google.inject.name.Names;
 import com.spotify.ffwd.AgentConfig;
+import com.spotify.ffwd.AppScope;
+import com.spotify.ffwd.CoreDependencies;
+import com.spotify.ffwd.InternalCoreDependencies;
 import com.spotify.ffwd.filter.Filter;
 import com.spotify.ffwd.filter.TrueFilter;
 import com.spotify.ffwd.statistics.CoreStatistics;
 import com.spotify.ffwd.statistics.OutputManagerStatistics;
+import dagger.Module;
+import dagger.Provides;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
+import java.util.function.Supplier;
 
+@Module
 public class OutputManagerModule {
     private static final List<OutputPlugin> DEFAULT_PLUGINS = Lists.newArrayList();
 
@@ -49,81 +50,75 @@ public class OutputManagerModule {
     public OutputManagerModule(
         @JsonProperty("plugins") List<OutputPlugin> plugins, @JsonProperty("filter") Filter filter
     ) {
-        this.plugins = Optional.fromNullable(plugins).or(DEFAULT_PLUGINS);
-        this.filter = Optional.fromNullable(filter).or(new TrueFilter());
+        this.plugins = Optional.ofNullable(plugins).orElse(DEFAULT_PLUGINS);
+        this.filter = Optional.ofNullable(filter).orElseGet(TrueFilter::new);
     }
 
-    public Module module() {
-        return new PrivateModule() {
-            @Provides
-            @Singleton
-            public OutputManagerStatistics statistics(CoreStatistics statistics) {
-                return statistics.newOutputManager();
-            }
+    @Provides
+    @AppScope
+    public OutputManagerStatistics statistics(CoreStatistics statistics) {
+        return statistics.newOutputManager();
+    }
 
-            @Provides
-            @Singleton
-            public List<PluginSink> sources(final Set<PluginSink> sinks) {
-                return Lists.newArrayList(sinks);
-            }
+    @Provides
+    @AppScope
+    public List<PluginSink> sinks(InternalCoreDependencies core) {
+        final List<PluginSink> sinks = new ArrayList<>();
 
-            @Provides
-            @Singleton
-            @Named("tags")
-            public Map<String, String> tags(AgentConfig config) {
-                return config.getTags();
-            }
-
-            @Provides
-            @Singleton
-            @Named("host")
-            public String host(AgentConfig config) {
-                return config.getHost();
-            }
-
-            @Provides
-            @Singleton
-            @Named("ttl")
-            public long ttl(AgentConfig config) {
-                return config.getTtl();
-            }
-
-            @Provides
-            @Singleton
-            public Filter filter() {
-                return filter;
-            }
-
-            @Override
-            protected void configure() {
-                bind(OutputManager.class).to(CoreOutputManager.class).in(Scopes.SINGLETON);
-                expose(OutputManager.class);
-
-                bindPlugins();
-            }
-
-            private void bindPlugins() {
-                final Multibinder<PluginSink> sinks =
-                    Multibinder.newSetBinder(binder(), PluginSink.class);
-
-                int i = 0;
-
-                for (final OutputPlugin p : plugins) {
-                    final String id = p.id(i++);
-                    final Key<PluginSink> k = Key.get(PluginSink.class, Names.named(id));
-                    install(p.module(k, id));
-                    sinks.addBinding().to(k);
+        for (final OutputPlugin output : plugins) {
+            final OutputPlugin.Exposed exposed = output.setup(new OutputPlugin.Depends() {
+                @Override
+                public Logger logger() {
+                    return LoggerFactory.getLogger(output.toString());
                 }
-            }
-        };
+
+                @Override
+                public CoreDependencies core() {
+                    return core;
+                }
+            });
+
+            sinks.add(exposed.sink());
+        }
+
+        return Collections.unmodifiableList(sinks);
+    }
+
+    @Provides
+    @AppScope
+    @Named("tags")
+    public Map<String, String> tags(AgentConfig config) {
+        return config.getTags();
+    }
+
+    @Provides
+    @AppScope
+    @Named("host")
+    public String host(AgentConfig config) {
+        return config.getHost();
+    }
+
+    @Provides
+    @AppScope
+    @Named("ttl")
+    public long ttl(AgentConfig config) {
+        return config.getTtl();
+    }
+
+    @Provides
+    @AppScope
+    @Named("output")
+    public Filter filter() {
+        return filter;
+    }
+
+    @Provides
+    @AppScope
+    public OutputManager outputManager(CoreOutputManager outputManager) {
+        return outputManager;
     }
 
     public static Supplier<OutputManagerModule> supplyDefault() {
-        return new Supplier<OutputManagerModule>() {
-            @Override
-            public OutputManagerModule get() {
-                return new OutputManagerModule(null, null);
-            }
-        };
+        return () -> new OutputManagerModule(null, null);
     }
 }

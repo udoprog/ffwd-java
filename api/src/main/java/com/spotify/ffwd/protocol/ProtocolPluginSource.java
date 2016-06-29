@@ -15,33 +15,35 @@
  **/
 package com.spotify.ffwd.protocol;
 
-import com.google.inject.Inject;
 import com.spotify.ffwd.input.PluginSource;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import eu.toolchain.async.Transform;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ProtocolPluginSource implements PluginSource {
-    @Inject
-    private AsyncFramework async;
+    private final AsyncFramework async;
+    private final ProtocolServers servers;
+    private final Protocol protocol;
+    private final ProtocolServer server;
+    private final RetryPolicy retry;
+    private final Logger log;
 
     @Inject
-    private ProtocolServers servers;
-
-    @Inject
-    private Protocol protocol;
-
-    @Inject
-    private ProtocolServer server;
-
-    @Inject
-    private RetryPolicy retry;
-
-    @Inject
-    private Logger log;
+    public ProtocolPluginSource(
+        final AsyncFramework async, final ProtocolServers servers, final Protocol protocol,
+        final ProtocolServer server, final RetryPolicy retry, final Logger log
+    ) {
+        this.async = async;
+        this.servers = servers;
+        this.protocol = protocol;
+        this.server = server;
+        this.retry = retry;
+        this.log = log;
+    }
 
     private final AtomicReference<ProtocolConnection> connection = new AtomicReference<>();
 

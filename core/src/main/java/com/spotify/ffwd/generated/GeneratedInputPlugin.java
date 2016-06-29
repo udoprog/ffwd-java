@@ -17,34 +17,36 @@ package com.spotify.ffwd.generated;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
 import com.spotify.ffwd.input.InputPlugin;
-import com.spotify.ffwd.input.PluginSource;
+import com.spotify.ffwd.input.InputPluginScope;
+import dagger.Module;
+import dagger.Provides;
 
+import javax.inject.Named;
+import java.util.Optional;
+
+@Module
 public class GeneratedInputPlugin implements InputPlugin {
     private final boolean sameHost;
 
     @JsonCreator
-    public GeneratedInputPlugin(@JsonProperty("sameHost") Boolean sameHost) {
-        this.sameHost = Optional.fromNullable(sameHost).or(false);
+    public GeneratedInputPlugin(@JsonProperty("sameHost") Optional<Boolean> sameHost) {
+        this.sameHost = sameHost.orElse(false);
+    }
+
+    @Provides
+    @InputPluginScope
+    @Named("sameHost")
+    public boolean sameHost() {
+        return sameHost;
     }
 
     @Override
-    public Module module(final Key<PluginSource> key, final String id) {
-        return new PrivateModule() {
-            @Override
-            protected void configure() {
-                bind(key).toInstance(new GeneratedPluginSource(sameHost));
-                expose(key);
-            }
-        };
-    }
-
-    @Override
-    public String id(int index) {
-        return String.format("%s[%d]", getClass().getPackage().getName(), index);
+    public Exposed setup(final Depends depends) {
+        return DaggerGeneratedInputPluginComponent
+            .builder()
+            .coreDependencies(depends.core())
+            .generatedInputPlugin(this)
+            .build();
     }
 }

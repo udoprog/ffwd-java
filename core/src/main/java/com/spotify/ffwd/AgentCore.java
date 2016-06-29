@@ -20,52 +20,22 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.Provides;
-import com.google.inject.Scopes;
-import com.google.inject.Singleton;
-import com.google.inject.name.Named;
-import com.google.inject.name.Names;
+import com.spotify.ffwd.debug.DaggerNettyDebugServerComponent;
+import com.spotify.ffwd.debug.DaggerNoopDebugServerComponent;
 import com.spotify.ffwd.debug.DebugServer;
-import com.spotify.ffwd.debug.NettyDebugServer;
-import com.spotify.ffwd.debug.NoopDebugServer;
-import com.spotify.ffwd.filter.AndFilter;
-import com.spotify.ffwd.filter.Filter;
-import com.spotify.ffwd.filter.FilterDeserializer;
-import com.spotify.ffwd.filter.MatchKey;
-import com.spotify.ffwd.filter.MatchTag;
-import com.spotify.ffwd.filter.NotFilter;
-import com.spotify.ffwd.filter.OrFilter;
-import com.spotify.ffwd.filter.TrueFilter;
-import com.spotify.ffwd.filter.TypeFilter;
+import com.spotify.ffwd.debug.DebugServerComponent;
+import com.spotify.ffwd.debug.NettyDebugServerModule;
 import com.spotify.ffwd.input.InputManager;
+import com.spotify.ffwd.input.InputManagerModule;
 import com.spotify.ffwd.module.FastForwardModule;
-import com.spotify.ffwd.module.PluginContext;
-import com.spotify.ffwd.module.PluginContextImpl;
 import com.spotify.ffwd.output.OutputManager;
-import com.spotify.ffwd.protocol.ProtocolClients;
-import com.spotify.ffwd.protocol.ProtocolClientsImpl;
-import com.spotify.ffwd.protocol.ProtocolServers;
-import com.spotify.ffwd.protocol.ProtocolServersImpl;
-import com.spotify.ffwd.serializer.Serializer;
-import com.spotify.ffwd.serializer.ToStringSerializer;
+import com.spotify.ffwd.output.OutputManagerModule;
 import com.spotify.ffwd.statistics.CoreStatistics;
 import com.spotify.ffwd.statistics.NoopCoreStatistics;
-import eu.toolchain.async.AsyncCaller;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
-import eu.toolchain.async.DirectAsyncCaller;
-import eu.toolchain.async.TinyAsync;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -75,15 +45,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -102,29 +65,32 @@ public class AgentCore {
     }
 
     public void run() throws Exception {
-        final Injector early = setupEarlyInjector();
+        final InternalEarlyDependencies early = setupEarlyInjector();
         final AgentConfig config = readConfig(early);
-        final Injector primary = setupPrimaryInjector(early, config);
+        final InternalCoreDependencies core = setupCore(early, config);
+        final InternalAppDependencies app = setupApp(core, config);
 
-        start(primary);
+        start(app);
         log.info("Started!");
 
-        waitUntilStopped(primary);
+        waitUntilStopped(app);
         log.info("Stopped, Bye Bye!");
     }
 
-    private void waitUntilStopped(final Injector primary) throws InterruptedException {
+    private void waitUntilStopped(final InternalAppDependencies app) throws InterruptedException {
         final CountDownLatch shutdown = new CountDownLatch(1);
-        Runtime.getRuntime().addShutdownHook(setupShutdownHook(primary, shutdown));
+        Runtime.getRuntime().addShutdownHook(setupShutdownHook(app, shutdown));
         shutdown.await();
     }
 
-    private Thread setupShutdownHook(final Injector primary, final CountDownLatch shutdown) {
+    private Thread setupShutdownHook(
+        final InternalAppDependencies app, final CountDownLatch shutdown
+    ) {
         final Thread thread = new Thread() {
             @Override
             public void run() {
                 try {
-                    AgentCore.this.stop(primary);
+                    AgentCore.this.stop(app);
                 } catch (Exception e) {
                     log.error("AgentCore#stop(Injector) failed", e);
                 }
@@ -138,13 +104,16 @@ public class AgentCore {
         return thread;
     }
 
-    private void start(final Injector primary)
-        throws Exception, InterruptedException, ExecutionException {
-        final InputManager input = primary.getInstance(InputManager.class);
-        final OutputManager output = primary.getInstance(OutputManager.class);
-        final DebugServer debug = primary.getInstance(DebugServer.class);
+    private void start(final InternalAppDependencies app) throws Exception {
+        final InputManager input = app.inputManager();
+        final OutputManager output = app.outputManager();
+        final DebugServer debug = app.debugServer();
 
-        final AsyncFramework async = primary.getInstance(AsyncFramework.class);
+        // Bind InputManager to the InputChannel.
+        final CoreInputChannel inputChannel = (CoreInputChannel) app.inputChannel();
+        inputChannel.setInput(input);
+
+        final AsyncFramework async = app.async();
         final ArrayList<AsyncFuture<Void>> startup = Lists.newArrayList();
 
         log.info("Waiting for all components to start...");
@@ -159,12 +128,12 @@ public class AgentCore {
         output.init();
     }
 
-    private void stop(final Injector primary) throws Exception {
-        final InputManager input = primary.getInstance(InputManager.class);
-        final OutputManager output = primary.getInstance(OutputManager.class);
-        final DebugServer debug = primary.getInstance(DebugServer.class);
+    private void stop(final InternalAppDependencies primary) throws Exception {
+        final InputManager input = primary.inputManager();
+        final OutputManager output = primary.outputManager();
+        final DebugServer debug = primary.debugServer();
+        final AsyncFramework async = primary.async();
 
-        final AsyncFramework async = primary.getInstance(AsyncFramework.class);
         final ArrayList<AsyncFuture<Void>> shutdown = Lists.newArrayList();
 
         log.info("Waiting for all components to stop...");
@@ -185,60 +154,28 @@ public class AgentCore {
 
     /**
      * Setup early application Injector.
-     *
+     * <p>
      * The early injector is used by modules to configure the system.
      *
      * @throws Exception If something could not be set up.
      */
-    private Injector setupEarlyInjector() throws Exception {
-        final List<Module> modules = Lists.newArrayList();
+    private InternalEarlyDependencies setupEarlyInjector() throws Exception {
+        final EarlyModule earlyModule = new EarlyModule();
 
-        modules.add(new AbstractModule() {
-            @Singleton
-            @Provides
-            public Map<String, FilterDeserializer.PartialDeserializer> filters() {
-                final Map<String, FilterDeserializer.PartialDeserializer> filters = new HashMap<>();
-                filters.put("key", new MatchKey.Deserializer());
-                filters.put("=", new MatchTag.Deserializer());
-                filters.put("true", new TrueFilter.Deserializer());
-                filters.put("false", new TrueFilter.Deserializer());
-                filters.put("and", new AndFilter.Deserializer());
-                filters.put("or", new OrFilter.Deserializer());
-                filters.put("not", new NotFilter.Deserializer());
-                filters.put("type", new TypeFilter.Deserializer());
-                return filters;
-            }
+        final InternalEarlyDependencies early =
+            DaggerInternalEarlyDependencies.builder().earlyModule(earlyModule).build();
 
-            @Singleton
-            @Provides
-            @Named("application/yaml+config")
-            public SimpleModule configModule(
-                Map<String, FilterDeserializer.PartialDeserializer> filters
-            ) {
-                final SimpleModule module = new SimpleModule();
-                module.addDeserializer(Filter.class, new FilterDeserializer(filters));
-                return module;
-            }
-
-            @Override
-            protected void configure() {
-                bind(PluginContext.class).toInstance(new PluginContextImpl());
-            }
-        });
-
-        final Injector injector = Guice.createInjector(modules);
-
-        for (final FastForwardModule m : loadModules(injector)) {
+        for (final FastForwardModule m : loadModules(early)) {
             log.info("Setting up {}", m);
 
             try {
-                m.setup();
+                m.setup(early);
             } catch (Exception e) {
                 throw new Exception("Failed to call #setup() for module: " + m, e);
             }
         }
 
-        return injector;
+        return early;
     }
 
     /**
@@ -246,112 +183,51 @@ public class AgentCore {
      *
      * @return The primary injector.
      */
-    private Injector setupPrimaryInjector(final Injector early, final AgentConfig config) {
-        final List<Module> modules = Lists.newArrayList();
+    private InternalCoreDependencies setupCore(
+        final InternalEarlyDependencies early, final AgentConfig config
+    ) {
+        final InputManagerModule inputManager = config.getInput();
+        final OutputManagerModule outputManager = config.getOutput();
+        final CoreModule core = new CoreModule(statistics, config);
 
-        modules.add(new AbstractModule() {
-            @Override
-            protected void configure() {
-                if (config.getDebug().isPresent()) {
-                    final AgentConfig.Debug debug = config.getDebug().get();
-                    bind(DebugServer.class).toInstance(
-                        new NettyDebugServer(debug.getLocalAddress()));
-                } else {
-                    bind(DebugServer.class).toInstance(new NoopDebugServer());
-                }
-            }
-        });
-
-        modules.add(new AbstractModule() {
-            @Singleton
-            @Provides
-            private CoreStatistics statistics() {
-                return statistics;
-            }
-
-            @Singleton
-            @Provides
-            private ExecutorService executor() {
-                final ThreadFactory factory =
-                    new ThreadFactoryBuilder().setNameFormat("ffwd-async-%d").build();
-                return Executors.newFixedThreadPool(config.getAsyncThreads(), factory);
-            }
-
-            @Singleton
-            @Provides
-            private ScheduledExecutorService scheduledExecutor() {
-                final ThreadFactory factory =
-                    new ThreadFactoryBuilder().setNameFormat("ffwd-scheduler-%d").build();
-                return Executors.newScheduledThreadPool(config.getSchedulerThreads(), factory);
-            }
-
-            @Singleton
-            @Provides
-            private AsyncFramework async(ExecutorService executor) {
-                final AsyncCaller caller = new DirectAsyncCaller() {
-                    @Override
-                    protected void internalError(String what, Throwable e) {
-                        log.error("Async call '{}' failed", what, e);
-                    }
-                };
-
-                return TinyAsync.builder().executor(executor).caller(caller).build();
-            }
-
-            @Singleton
-            @Provides
-            @Named("boss")
-            public EventLoopGroup bosses() {
-                final ThreadFactory factory =
-                    new ThreadFactoryBuilder().setNameFormat("ffwd-boss-%d").build();
-                return new NioEventLoopGroup(config.getBossThreads(), factory);
-            }
-
-            @Singleton
-            @Provides
-            @Named("worker")
-            public EventLoopGroup workers() {
-                final ThreadFactory factory =
-                    new ThreadFactoryBuilder().setNameFormat("ffwd-worker-%d").build();
-                return new NioEventLoopGroup(config.getWorkerThreads(), factory);
-            }
-
-            @Singleton
-            @Provides
-            @Named("application/json")
-            public ObjectMapper jsonMapper() {
-                return new ObjectMapper();
-            }
-
-            @Singleton
-            @Provides
-            public AgentConfig config() {
-                return config;
-            }
-
-            @Override
-            protected void configure() {
-                bind(Key.get(Serializer.class, Names.named("default")))
-                    .to(ToStringSerializer.class)
-                    .in(Scopes.SINGLETON);
-                bind(Timer.class).to(HashedWheelTimer.class).in(Scopes.SINGLETON);
-                bind(ProtocolServers.class).to(ProtocolServersImpl.class).in(Scopes.SINGLETON);
-                bind(ProtocolClients.class).to(ProtocolClientsImpl.class).in(Scopes.SINGLETON);
-            }
-        });
-
-        modules.add(config.getInput().module());
-        modules.add(config.getOutput().module());
-
-        return early.createChildInjector(modules);
+        return DaggerInternalCoreDependencies
+            .builder()
+            .coreModule(core)
+            .internalEarlyDependencies(early)
+            .build();
     }
 
-    private AgentConfig readConfig(Injector early) throws IOException {
+    private InternalAppDependencies setupApp(
+        final InternalCoreDependencies core, final AgentConfig config
+    ) {
+        final DebugServerComponent debugServer = config.getDebug().<DebugServerComponent>map(d -> {
+            return DaggerNettyDebugServerComponent
+                .builder()
+                .coreDependencies(core)
+                .nettyDebugServerModule(new NettyDebugServerModule(d))
+                .build();
+        }).orElseGet(() -> {
+            return DaggerNoopDebugServerComponent.builder().coreDependencies(core).build();
+        });
+
+        final AppModule app = new AppModule();
+
+        return DaggerInternalAppDependencies
+            .builder()
+            .appModule(app)
+            .inputManagerModule(config.getInput())
+            .outputManagerModule(config.getOutput())
+            .debugServerComponent(debugServer)
+            .internalCoreDependencies(core)
+            .build();
+    }
+
+    private AgentConfig readConfig(EarlyDependencies early) throws IOException {
         final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        final SimpleModule module =
-            early.getInstance(Key.get(SimpleModule.class, Names.named("application/yaml+config")));
+        final SimpleModule module = early.configModule();
 
         mapper.registerModule(module);
+        mapper.registerModule(new Jdk8Module());
 
         try (final InputStream input = Files.newInputStream(this.config)) {
             return mapper.readValue(input, AgentConfig.class);
@@ -360,7 +236,7 @@ public class AgentCore {
         }
     }
 
-    private List<FastForwardModule> loadModules(Injector injector) throws Exception {
+    private List<FastForwardModule> loadModules(EarlyDependencies early) throws Exception {
         final List<FastForwardModule> modules = Lists.newArrayList();
 
         for (final Class<? extends FastForwardModule> module : this.modules) {
@@ -380,7 +256,6 @@ public class AgentCore {
                 throw new Exception("Failed to call constructor for class: " + module, e);
             }
 
-            injector.injectMembers(m);
             modules.add(m);
         }
 

@@ -24,14 +24,14 @@ public interface InputManager extends Initializable {
     /**
      * Receive a single event.
      */
-    public void receiveEvent(Event event);
+    void receiveEvent(Event event);
 
     /**
      * Receive a single metric.
      */
-    public void receiveMetric(Metric metric);
+    void receiveMetric(Metric metric);
 
-    public AsyncFuture<Void> start();
+    AsyncFuture<Void> start();
 
-    public AsyncFuture<Void> stop();
+    AsyncFuture<Void> stop();
 }

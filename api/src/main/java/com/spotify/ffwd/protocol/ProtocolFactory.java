@@ -17,10 +17,10 @@ package com.spotify.ffwd.protocol;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Supplier;
 import lombok.Data;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 /**
  * Data type suitable for building using a @JsonCreator block.
@@ -31,16 +31,16 @@ import java.net.InetSocketAddress;
 public class ProtocolFactory {
     public static final String DEFAULT_HOST = "127.0.0.1";
 
-    private final String type;
-    private final String host;
-    private final Integer port;
-    private final Integer receiveBufferSize;
+    private final Optional<String> type;
+    private final Optional<String> host;
+    private final Optional<Integer> port;
+    private final Optional<Integer> receiveBufferSize;
 
     @JsonCreator
     public ProtocolFactory(
-        @JsonProperty("type") String type, @JsonProperty("host") String host,
-        @JsonProperty("port") Integer port,
-        @JsonProperty("receiveBufferSize") Integer receiveBufferSize
+        @JsonProperty("type") Optional<String> type, @JsonProperty("host") Optional<String> host,
+        @JsonProperty("port") Optional<Integer> port,
+        @JsonProperty("receiveBufferSize") Optional<Integer> receiveBufferSize
     ) {
         this.type = type;
         this.host = host;
@@ -53,13 +53,9 @@ public class ProtocolFactory {
      *
      * @return
      */
-    public static Supplier<ProtocolFactory> defaultFor() {
-        return new Supplier<ProtocolFactory>() {
-            @Override
-            public ProtocolFactory get() {
-                return new ProtocolFactory(null, null, null, null);
-            }
-        };
+    public static ProtocolFactory defaultInstance() {
+        return new ProtocolFactory(Optional.empty(), Optional.empty(), Optional.empty(),
+            Optional.empty());
     }
 
     /**
@@ -79,39 +75,19 @@ public class ProtocolFactory {
      */
     public Protocol protocol(ProtocolType defaultType, int defaultPort, String defaultHost) {
         final ProtocolType t = parseProtocolType(type, defaultType);
-        final InetSocketAddress address = parseSocketAddress(host, port, defaultPort, defaultHost);
+        final InetSocketAddress address = parseSocketAddress(host, port, defaultHost, defaultPort);
         return new Protocol(t, address, receiveBufferSize);
     }
 
     private InetSocketAddress parseSocketAddress(
-        String host, Integer port, int defaultPort, String defaultHost
+        Optional<String> host, Optional<Integer> port, String defaultHost, int defaultPort
     ) {
-        if (host == null) {
-            host = defaultHost;
-        }
-
-        if (port == null) {
-            port = defaultPort;
-        }
-
-        return new InetSocketAddress(host, port);
+        final String h = host.orElse(defaultHost);
+        final int p = port.orElse(defaultPort);
+        return new InetSocketAddress(h, p);
     }
 
-    private ProtocolType parseProtocolType(String type, ProtocolType defaultType) {
-        if (type == null) {
-            return defaultType;
-        }
-
-        type = type.toUpperCase();
-
-        if (ProtocolType.TCP.name().equals(type)) {
-            return ProtocolType.TCP;
-        }
-
-        if (ProtocolType.UDP.name().equals(type)) {
-            return ProtocolType.UDP;
-        }
-
-        throw new IllegalArgumentException("Invalid protocol type: " + type);
+    private ProtocolType parseProtocolType(Optional<String> type, ProtocolType defaultType) {
+        return type.map(t -> ProtocolType.valueOf(t.toUpperCase())).orElse(defaultType);
     }
 }

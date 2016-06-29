@@ -22,8 +22,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import io.netty.buffer.ByteBuf;
@@ -31,9 +30,10 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
@@ -44,15 +44,20 @@ import java.util.Map;
 import java.util.Set;
 
 @Slf4j
-@RequiredArgsConstructor
 @Sharable
+@InputPluginScope
 public class JsonObjectMapperDecoder extends MessageToMessageDecoder<ByteBuf> {
     public static final Set<String> EMPTY_TAGS = Sets.newHashSet();
     public static final Map<String, String> EMPTY_ATTRIBUTES = new HashMap<>();
 
+    private final ObjectMapper mapper;
+
     @Inject
-    @Named("application/json")
-    private ObjectMapper mapper;
+    public JsonObjectMapperDecoder(
+        @Named("application/json") ObjectMapper mapper
+    ) {
+        this.mapper = mapper;
+    }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)

@@ -15,16 +15,12 @@
  **/
 package com.spotify.ffwd.generated;
 
-import com.google.inject.Inject;
+import com.spotify.ffwd.EarlyDependencies;
 import com.spotify.ffwd.module.FastForwardModule;
-import com.spotify.ffwd.module.PluginContext;
 
 public class GeneratedModule implements FastForwardModule {
-    @Inject
-    private PluginContext context;
-
     @Override
-    public void setup() throws Exception {
-        context.registerInput("generated", GeneratedInputPlugin.class);
+    public void setup(EarlyDependencies early) throws Exception {
+        early.context().registerInput("generated", GeneratedInputPlugin.class);
     }
 }

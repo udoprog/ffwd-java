@@ -17,8 +17,6 @@ package com.spotify.ffwd.output;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import com.spotify.ffwd.debug.DebugServer;
 import com.spotify.ffwd.filter.Filter;
 import com.spotify.ffwd.model.Event;
@@ -28,6 +26,8 @@ import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -37,32 +37,31 @@ import java.util.Map;
 public class CoreOutputManager implements OutputManager {
     private static final String DEBUG_ID = "core.output";
 
-    @Inject
-    private List<PluginSink> sinks;
+    private final List<PluginSink> sinks;
+    private final AsyncFramework async;
+    private final Map<String, String> tags;
+    private final String host;
+    private final long ttl;
+    private final DebugServer debug;
+    private final OutputManagerStatistics statistics;
+    private final Filter filter;
 
     @Inject
-    private AsyncFramework async;
-
-    @Inject
-    @Named("tags")
-    private Map<String, String> tags;
-
-    @Inject
-    @Named("host")
-    private String host;
-
-    @Inject
-    @Named("ttl")
-    private long ttl;
-
-    @Inject
-    private DebugServer debug;
-
-    @Inject
-    private OutputManagerStatistics statistics;
-
-    @Inject
-    private Filter filter;
+    public CoreOutputManager(
+        final List<PluginSink> sinks, final AsyncFramework async,
+        @Named("tags") final Map<String, String> tags, @Named("host") final String host,
+        @Named("ttl") final long ttl, final DebugServer debug,
+        final OutputManagerStatistics statistics, @Named("output") final Filter filter
+    ) {
+        this.sinks = sinks;
+        this.async = async;
+        this.tags = tags;
+        this.host = host;
+        this.ttl = ttl;
+        this.debug = debug;
+        this.statistics = statistics;
+        this.filter = filter;
+    }
 
     @Override
     public void init() {

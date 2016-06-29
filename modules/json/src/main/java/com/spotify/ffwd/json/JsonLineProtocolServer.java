@@ -16,26 +16,34 @@
 package com.spotify.ffwd.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
+import com.spotify.ffwd.input.InputChannelInboundHandler;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.protocol.ProtocolServer;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
+@InputPluginScope
 public class JsonLineProtocolServer implements ProtocolServer {
     public static final int MAX_LINE = 0xffff;
 
-    @Inject
-    @Named("application/json")
-    private ObjectMapper mapper;
+    private final ObjectMapper mapper;
+    private final ChannelInboundHandler handler;
+    private final JsonObjectMapperDecoder decoder;
 
     @Inject
-    private ChannelInboundHandler handler;
-
-    @Inject
-    private JsonObjectMapperDecoder decoder;
+    public JsonLineProtocolServer(
+        @Named("application/json") ObjectMapper mapper, InputChannelInboundHandler handler,
+        JsonObjectMapperDecoder decoder
+    ) {
+        this.mapper = mapper;
+        this.handler = handler;
+        this.decoder = decoder;
+    }
 
     @Override
     public final ChannelInitializer<Channel> initializer() {

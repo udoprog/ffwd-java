@@ -15,7 +15,7 @@
  **/
 package com.spotify.ffwd.input;
 
-import com.google.inject.Inject;
+import com.spotify.ffwd.CoreScope;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -23,11 +23,18 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
+
 @Slf4j
 @Sharable
+@CoreScope
 public class InputChannelInboundHandler extends ChannelInboundHandlerAdapter {
+    private final InputChannel input;
+
     @Inject
-    private InputManager input;
+    public InputChannelInboundHandler(InputChannel input) {
+        this.input = input;
+    }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {

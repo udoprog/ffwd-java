@@ -23,12 +23,12 @@ input:
     - type: protobuf
       protocol:
         type: tcp
-    - type: riemann
-      protocol:
-        type: tcp
-    - type: riemann
-      protocol:
-        type: udp
+    #- type: riemann
+    #  protocol:
+    #    type: tcp
+    #- type: riemann
+    #  protocol:
+    #    type: udp
 
 output:
   filter:
@@ -38,12 +38,13 @@ output:
       - ["=", "stat", "p99"]
   plugins:
     - type: noop
-      flushInterval: 10000
+      flush:
+        flushInterval: 10000
     - type: template
-    - type: riemann
-      flushInterval: 10000
-      protocol:
-        type: tcp
+    #- type: riemann
+    #  flushInterval: 10000
+    #  protocol:
+    #    type: tcp
     #- type: debug
     #  flushInterval: 10000
     #- type: kafka

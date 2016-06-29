@@ -18,12 +18,17 @@ package com.spotify.ffwd.input;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-import com.google.inject.Key;
-import com.google.inject.Module;
+import com.spotify.ffwd.CoreDependencies;
 
 @JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "type")
 public interface InputPlugin {
-    public Module module(Key<PluginSource> key, String id);
+    Exposed setup(Depends depends);
 
-    public String id(int index);
+    interface Depends {
+        CoreDependencies core();
+    }
+
+    interface Exposed {
+        PluginSource source();
+    }
 }

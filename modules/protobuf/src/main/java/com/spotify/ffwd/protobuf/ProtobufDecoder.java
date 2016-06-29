@@ -16,6 +16,7 @@
 package com.spotify.ffwd.protobuf;
 
 import com.google.protobuf250.InvalidProtocolBufferException;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import com.spotify.ffwd.protocol0.Protocol0;
@@ -26,6 +27,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import java.io.InputStream;
 import java.util.Date;
 import java.util.HashMap;
@@ -34,10 +36,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@InputPluginScope
 @Slf4j
 @Sharable
 public class ProtobufDecoder extends MessageToMessageDecoder<ByteBuf> {
     public static final int MAX_FRAME_SIZE = 0xffffff;
+
+    @Inject
+    public ProtobufDecoder() {
+    }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)

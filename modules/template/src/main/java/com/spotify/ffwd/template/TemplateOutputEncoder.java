@@ -15,16 +15,23 @@
  **/
 package com.spotify.ffwd.template;
 
+import com.spotify.ffwd.output.OutputPluginScope;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import java.util.List;
 
 @Slf4j
 @Sharable
+@OutputPluginScope
 public class TemplateOutputEncoder extends MessageToMessageEncoder<Object> {
+    @Inject
+    public TemplateOutputEncoder() {
+    }
+
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out)
         throws Exception {

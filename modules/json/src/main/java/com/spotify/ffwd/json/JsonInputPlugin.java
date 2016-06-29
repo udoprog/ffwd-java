@@ -17,19 +17,24 @@ package com.spotify.ffwd.json;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
-import com.google.inject.Scopes;
 import com.spotify.ffwd.input.InputPlugin;
-import com.spotify.ffwd.input.PluginSource;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.protocol.Protocol;
 import com.spotify.ffwd.protocol.ProtocolFactory;
 import com.spotify.ffwd.protocol.ProtocolServer;
 import com.spotify.ffwd.protocol.ProtocolType;
 import com.spotify.ffwd.protocol.RetryPolicy;
+import dagger.Lazy;
+import dagger.Module;
+import dagger.Provides;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+
+@Slf4j
+@Module
 public class JsonInputPlugin implements InputPlugin {
     private static final ProtocolType DEFAULT_PROTOCOL = ProtocolType.UDP;
     private static final int DEFAULT_PORT = 19000;
@@ -40,21 +45,20 @@ public class JsonInputPlugin implements InputPlugin {
     public static final String DEFAULT_DELIMITER = FRAME;
 
     private final Protocol protocol;
-    private final Class<? extends ProtocolServer> protocolServer;
+    private final String delimiter;
     private final RetryPolicy retry;
 
     @JsonCreator
     public JsonInputPlugin(
-        @JsonProperty("protocol") ProtocolFactory protocol,
-        @JsonProperty("delimiter") String delimiter, @JsonProperty("retry") RetryPolicy retry
+        @JsonProperty("protocol") Optional<ProtocolFactory> protocol,
+        @JsonProperty("delimiter") Optional<String> delimiter,
+        @JsonProperty("retry") Optional<RetryPolicy> retry
     ) {
-        this.protocol = Optional
-            .fromNullable(protocol)
-            .or(ProtocolFactory.defaultFor())
+        this.protocol = protocol
+            .orElseGet(ProtocolFactory::defaultInstance)
             .protocol(DEFAULT_PROTOCOL, DEFAULT_PORT);
-        this.protocolServer =
-            parseProtocolServer(Optional.fromNullable(delimiter).or(defaultDelimiter()));
-        this.retry = Optional.fromNullable(retry).or(new RetryPolicy.Exponential());
+        this.delimiter = delimiter.orElseGet(this::defaultDelimiter);
+        this.retry = retry.orElseGet(RetryPolicy.Exponential::new);
     }
 
     private String defaultDelimiter() {
@@ -66,51 +70,57 @@ public class JsonInputPlugin implements InputPlugin {
             return FRAME;
         }
 
-        return FRAME;
+        return DEFAULT_DELIMITER;
     }
 
-    private Class<? extends ProtocolServer> parseProtocolServer(String delimiter) {
+    @Provides
+    @InputPluginScope
+    public Protocol protocol() {
+        return protocol;
+    }
+
+    @Provides
+    @InputPluginScope
+    public RetryPolicy retry() {
+        return retry;
+    }
+
+    @Provides
+    @InputPluginScope
+    public ProtocolServer protocolServer(
+        Lazy<JsonFrameProtocolServer> frame, Lazy<JsonLineProtocolServer> line
+    ) {
         if (FRAME.equals(delimiter)) {
             if (protocol.getType() == ProtocolType.TCP) {
                 throw new IllegalArgumentException("frame-based decoding is not suitable for TCP");
             }
 
-            return JsonFrameProtocolServer.class;
+            return frame.get();
         }
 
         if (LINE.equals(delimiter)) {
-            return JsonLineProtocolServer.class;
+            return line.get();
         }
 
-        return defaultProtocolServer();
-    }
-
-    private Class<? extends ProtocolServer> defaultProtocolServer() {
         if (protocol.getType() == ProtocolType.TCP) {
-            return JsonLineProtocolServer.class;
+            return line.get();
         }
 
-        return JsonFrameProtocolServer.class;
+        return frame.get();
+    }
+
+    @Provides
+    @InputPluginScope
+    public Logger log() {
+        return LoggerFactory.getLogger(log.getName() + "[" + protocol + "]");
     }
 
     @Override
-    public Module module(final Key<PluginSource> key, final String id) {
-        return new PrivateModule() {
-            @Override
-            protected void configure() {
-                bind(JsonObjectMapperDecoder.class).in(Scopes.SINGLETON);
-                bind(Protocol.class).toInstance(protocol);
-                bind(ProtocolServer.class).to(protocolServer).in(Scopes.SINGLETON);
-                bind(RetryPolicy.class).toInstance(retry);
-
-                bind(key).to(JsonPluginSource.class).in(Scopes.SINGLETON);
-                expose(key);
-            }
-        };
-    }
-
-    @Override
-    public String id(int index) {
-        return String.format("%s[%s]", getClass().getPackage().getName(), protocol.toString());
+    public Exposed setup(final Depends depends) {
+        return DaggerJsonInputPluginComponent
+            .builder()
+            .coreDependencies(depends.core())
+            .jsonInputPlugin(this)
+            .build();
     }
 }

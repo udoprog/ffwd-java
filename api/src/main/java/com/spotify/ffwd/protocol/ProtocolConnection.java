@@ -20,11 +20,11 @@ import eu.toolchain.async.AsyncFuture;
 import java.util.Collection;
 
 public interface ProtocolConnection {
-    public void send(Object message);
+    void send(Object message);
 
-    public AsyncFuture<Void> stop();
+    AsyncFuture<Void> stop();
 
-    public AsyncFuture<Void> sendAll(Collection<? extends Object> batch);
+    AsyncFuture<Void> sendAll(Collection<? extends Object> batch);
 
-    public boolean isConnected();
+    boolean isConnected();
 }

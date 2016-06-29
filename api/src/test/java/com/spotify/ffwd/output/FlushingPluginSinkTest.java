@@ -15,15 +15,10 @@
  **/
 package com.spotify.ffwd.output;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-
-import java.util.concurrent.ScheduledExecutorService;
-
+import com.spotify.ffwd.model.Event;
+import com.spotify.ffwd.model.Metric;
+import com.spotify.ffwd.statistics.OutputPluginStatistics;
+import eu.toolchain.async.AsyncFramework;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,16 +26,20 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.slf4j.Logger;
 
-import com.spotify.ffwd.model.Event;
-import com.spotify.ffwd.model.Metric;
+import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
 
-import eu.toolchain.async.AsyncFramework;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 @RunWith(MockitoJUnitRunner.class)
 public class FlushingPluginSinkTest {
-    private final long flushInterval = 1000;
-    private final long batchSizeLimit = 2000;
-    private final long maxPendingFlushes = 3000;
+    private final FlushConfig flushConfig =
+        new FlushConfig(Optional.empty(), Optional.empty(), Optional.empty());
 
     @Mock
     private AsyncFramework async;
@@ -63,24 +62,15 @@ public class FlushingPluginSinkTest {
     @Mock
     private ScheduledExecutorService scheduler;
 
+    @Mock
+    private OutputPluginStatistics statistics;
+
     private FlushingPluginSink sink;
 
     @Before
     public void setup() {
-        sink = spy(new FlushingPluginSink(flushInterval, batchSizeLimit, maxPendingFlushes));
-        sink.sink = childSink;
-        sink.async = async;
-        sink.log = log;
-        sink.scheduler = scheduler;
-    }
-
-    @Test
-    public void testDefaultConstructor() {
-        final FlushingPluginSink s = new FlushingPluginSink(1);
-
-        assertEquals(1, s.flushInterval);
-        assertEquals(FlushingPluginSink.DEFAULT_BATCH_SIZE_LIMIT, s.batchSizeLimit);
-        assertEquals(FlushingPluginSink.DEFAULT_MAX_PENDING_FLUSHES, s.maxPendingFlushes);
+        sink =
+            spy(new FlushingPluginSink(async, childSink, scheduler, log, statistics, flushConfig));
     }
 
     @Test
@@ -129,7 +119,7 @@ public class FlushingPluginSinkTest {
 
     @Test
     public void testCheckBatchFlushes() {
-        doReturn((int) batchSizeLimit).when(batch).size();
+        doReturn((int) FlushingPluginSink.DEFAULT_BATCH_SIZE_LIMIT).when(batch).size();
         doNothing().when(sink).flushNowThenScheduleNext();
 
         sink.checkBatch(batch);
@@ -139,7 +129,7 @@ public class FlushingPluginSinkTest {
 
     @Test
     public void testCheckBatchDoesntFlush() {
-        doReturn((int) batchSizeLimit - 1).when(batch).size();
+        doReturn((int) FlushingPluginSink.DEFAULT_BATCH_SIZE_LIMIT - 1).when(batch).size();
         doNothing().when(sink).flushNowThenScheduleNext();
 
         sink.checkBatch(batch);

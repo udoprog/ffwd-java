@@ -16,7 +16,6 @@
 package com.spotify.ffwd.input;
 
 import com.google.common.collect.Lists;
-import com.google.inject.Inject;
 import com.spotify.ffwd.debug.DebugServer;
 import com.spotify.ffwd.filter.Filter;
 import com.spotify.ffwd.model.Event;
@@ -27,6 +26,8 @@ import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import lombok.ToString;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,27 +36,29 @@ import java.util.List;
  *
  * @author udoprog
  */
-@ToString(of = {"sources"})
+@ToString(of = {"sinks"})
 public class CoreInputManager implements InputManager {
     private static final String DEBUG_ID = "core.input";
+    private final List<PluginSource> sources;
+    private final AsyncFramework async;
+    private final OutputManager output;
+    private final DebugServer debug;
+    private final InputManagerStatistics statistics;
+    private final Filter filter;
 
     @Inject
-    private List<PluginSource> sources;
-
-    @Inject
-    private AsyncFramework async;
-
-    @Inject
-    private OutputManager output;
-
-    @Inject
-    private DebugServer debug;
-
-    @Inject
-    private InputManagerStatistics statistics;
-
-    @Inject
-    private Filter filter;
+    public CoreInputManager(
+        final List<PluginSource> sources, final AsyncFramework async, final OutputManager output,
+        final DebugServer debug, final InputManagerStatistics statistics,
+        @Named("input") final Filter filter
+    ) {
+        this.sources = sources;
+        this.async = async;
+        this.output = output;
+        this.debug = debug;
+        this.statistics = statistics;
+        this.filter = filter;
+    }
 
     @Override
     public void init() {

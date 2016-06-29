@@ -15,7 +15,7 @@
  **/
 package com.spotify.ffwd.json;
 
-import com.google.inject.Inject;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.input.PluginSource;
 import com.spotify.ffwd.protocol.Protocol;
 import com.spotify.ffwd.protocol.ProtocolConnection;
@@ -27,24 +27,29 @@ import eu.toolchain.async.AsyncFuture;
 import eu.toolchain.async.Transform;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import java.util.concurrent.atomic.AtomicReference;
 
+@InputPluginScope
 @Slf4j
 public class JsonPluginSource implements PluginSource {
-    @Inject
-    private AsyncFramework async;
+    private final AsyncFramework async;
+    private final ProtocolServers servers;
+    private final Protocol protocol;
+    private final ProtocolServer server;
+    private final RetryPolicy policy;
 
     @Inject
-    private ProtocolServers servers;
-
-    @Inject
-    private Protocol protocol;
-
-    @Inject
-    private ProtocolServer server;
-
-    @Inject
-    private RetryPolicy policy;
+    public JsonPluginSource(
+        final AsyncFramework async, final ProtocolServers servers, final Protocol protocol,
+        final ProtocolServer server, final RetryPolicy policy
+    ) {
+        this.async = async;
+        this.servers = servers;
+        this.protocol = protocol;
+        this.server = server;
+        this.policy = policy;
+    }
 
     private final AtomicReference<ProtocolConnection> connection = new AtomicReference<>();
 

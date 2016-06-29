@@ -16,7 +16,6 @@
 package com.spotify.ffwd.serializer;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.google.common.base.Supplier;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import lombok.extern.slf4j.Slf4j;
@@ -38,12 +37,9 @@ public class ToStringSerializer implements Serializer {
         return metric.toString().getBytes();
     }
 
-    public static Supplier<Serializer> defaultSupplier() {
-        return new Supplier<Serializer>() {
-            @Override
-            public Serializer get() {
-                return new ToStringSerializer();
-            }
-        };
+    public static final Serializer INSTANCE = new ToStringSerializer();
+
+    public static Serializer defaultInstance() {
+        return INSTANCE;
     }
 }

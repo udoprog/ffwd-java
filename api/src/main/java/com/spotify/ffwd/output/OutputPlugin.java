@@ -18,12 +18,20 @@ package com.spotify.ffwd.output;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-import com.google.inject.Key;
-import com.google.inject.Module;
+import com.spotify.ffwd.CoreDependencies;
+import org.slf4j.Logger;
 
 @JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "type")
 public interface OutputPlugin {
-    public Module module(Key<PluginSink> key, String id);
+    Exposed setup(Depends depends);
 
-    public String id(int index);
+    interface Depends {
+        Logger logger();
+
+        CoreDependencies core();
+    }
+
+    interface Exposed {
+        PluginSink sink();
+    }
 }

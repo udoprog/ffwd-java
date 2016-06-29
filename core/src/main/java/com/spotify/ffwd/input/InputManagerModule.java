@@ -17,26 +17,26 @@ package com.spotify.ffwd.input;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
-import com.google.inject.Provides;
-import com.google.inject.Scopes;
-import com.google.inject.Singleton;
-import com.google.inject.multibindings.Multibinder;
-import com.google.inject.name.Names;
+import com.spotify.ffwd.AppScope;
+import com.spotify.ffwd.CoreDependencies;
+import com.spotify.ffwd.InternalCoreDependencies;
 import com.spotify.ffwd.filter.Filter;
 import com.spotify.ffwd.filter.TrueFilter;
 import com.spotify.ffwd.statistics.CoreStatistics;
 import com.spotify.ffwd.statistics.InputManagerStatistics;
+import dagger.Module;
+import dagger.Provides;
 import io.netty.channel.ChannelInboundHandler;
 
+import javax.inject.Named;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
+import java.util.function.Supplier;
 
+@Module
 public class InputManagerModule {
     private static final List<InputPlugin> DEFAULT_PLUGINS = Lists.newArrayList();
 
@@ -47,62 +47,55 @@ public class InputManagerModule {
     public InputManagerModule(
         @JsonProperty("plugins") List<InputPlugin> plugins, @JsonProperty("filter") Filter filter
     ) {
-        this.plugins = Optional.fromNullable(plugins).or(DEFAULT_PLUGINS);
-        this.filter = Optional.fromNullable(filter).or(new TrueFilter());
+        this.plugins = Optional.ofNullable(plugins).orElse(DEFAULT_PLUGINS);
+        this.filter = Optional.ofNullable(filter).orElseGet(TrueFilter::new);
     }
 
-    public Module module() {
-        return new PrivateModule() {
-            @Provides
-            @Singleton
-            public InputManagerStatistics statistics(CoreStatistics statistics) {
-                return statistics.newInputManager();
-            }
+    @Provides
+    @AppScope
+    public InputManagerStatistics statistics(CoreStatistics statistics) {
+        return statistics.newInputManager();
+    }
 
-            @Provides
-            @Singleton
-            public List<PluginSource> sources(final Set<PluginSource> sources) {
-                return Lists.newArrayList(sources);
-            }
+    @Provides
+    @AppScope
+    public List<PluginSource> sources(InternalCoreDependencies core) {
+        final List<PluginSource> sources = new ArrayList<>();
 
-            @Provides
-            @Singleton
-            public Filter filter() {
-                return filter;
-            }
-
-            @Override
-            protected void configure() {
-                bind(ChannelInboundHandler.class).to(InputChannelInboundHandler.class);
-
-                bind(InputManager.class).to(CoreInputManager.class).in(Scopes.SINGLETON);
-                expose(InputManager.class);
-
-                bindPlugins();
-            }
-
-            private void bindPlugins() {
-                final Multibinder<PluginSource> sources =
-                    Multibinder.newSetBinder(binder(), PluginSource.class);
-
-                int i = 0;
-
-                for (final InputPlugin p : plugins) {
-                    final String id = p.id(i++);
-                    final Key<PluginSource> k = Key.get(PluginSource.class, Names.named(id));
-                    install(p.module(k, id));
-                    sources.addBinding().to(k);
+        for (final InputPlugin input : plugins) {
+            final InputPlugin.Exposed exposed = input.setup(new InputPlugin.Depends() {
+                @Override
+                public CoreDependencies core() {
+                    return core;
                 }
-            }
-        };
+            });
+
+            sources.add(exposed.source());
+        }
+
+        return Collections.unmodifiableList(sources);
+    }
+
+    @Provides
+    @AppScope
+    @Named("input")
+    public Filter filter() {
+        return filter;
+    }
+
+    @Provides
+    @AppScope
+    public ChannelInboundHandler inboundHandler(InputChannelInboundHandler inboundHandler) {
+        return inboundHandler;
+    }
+
+    @Provides
+    @AppScope
+    public InputManager inputManager(CoreInputManager inputManager) {
+        return inputManager;
     }
 
     public static Supplier<InputManagerModule> supplyDefault() {
-        return new Supplier<InputManagerModule>() {
-            @Override
-            public InputManagerModule get() {
-                return new InputManagerModule(null, null);
-            }
-        };
+        return () -> new InputManagerModule(null, null);
     }
 }

@@ -17,14 +17,15 @@ package com.spotify.ffwd.generated;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.Inject;
-import com.spotify.ffwd.input.InputManager;
+import com.spotify.ffwd.input.InputChannel;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.input.PluginSource;
 import com.spotify.ffwd.model.Metric;
-import com.spotify.ffwd.output.OutputManager;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -35,15 +36,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@InputPluginScope
 public class GeneratedPluginSource implements PluginSource {
-    @Inject
-    private AsyncFramework async;
-
-    @Inject
-    private InputManager input;
-    @Inject
-    private OutputManager output;
-
     private final int count = 10000;
 
     private volatile AsyncFuture<Void> task;
@@ -53,9 +47,17 @@ public class GeneratedPluginSource implements PluginSource {
     private final Random random = new Random();
     private final ExecutorService single = Executors.newSingleThreadExecutor();
 
+    private final AsyncFramework async;
+    private final InputChannel input;
     private final boolean sameHost;
 
-    public GeneratedPluginSource(boolean sameHost) {
+    @Inject
+    public GeneratedPluginSource(
+        final AsyncFramework async, final InputChannel input,
+        @Named("sameHost") final boolean sameHost
+    ) {
+        this.async = async;
+        this.input = input;
         this.sameHost = sameHost;
     }
 

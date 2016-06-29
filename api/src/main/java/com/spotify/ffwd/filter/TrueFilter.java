@@ -16,10 +16,8 @@
 package com.spotify.ffwd.filter;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.google.common.base.Supplier;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import lombok.Data;
@@ -40,8 +38,7 @@ public class TrueFilter implements Filter {
 
     public static class Deserializer implements FilterDeserializer.PartialDeserializer {
         @Override
-        public Filter deserialize(JsonParser p, DeserializationContext ctx)
-            throws IOException, JsonProcessingException {
+        public Filter deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
             if (p.nextToken() != JsonToken.END_ARRAY) {
                 throw ctx.wrongTokenException(p, JsonToken.END_ARRAY, null);
             }
@@ -50,12 +47,9 @@ public class TrueFilter implements Filter {
         }
     }
 
-    public static Supplier<TrueFilter> supplier() {
-        return new Supplier<TrueFilter>() {
-            @Override
-            public TrueFilter get() {
-                return new TrueFilter();
-            }
-        };
+    public static final TrueFilter INSTANCE = new TrueFilter();
+
+    public static TrueFilter get() {
+        return INSTANCE;
     }
 }

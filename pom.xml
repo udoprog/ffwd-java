@@ -1,5 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.spotify.ffwd</groupId>
@@ -17,12 +18,12 @@
     <module>core</module>
     <module>agent</module>
     <module>protobuf250</module>
-    <module>modules/kafka</module>
-    <module>modules/riemann</module>
-    <module>modules/carbon</module>
     <module>modules/template</module>
-    <module>modules/protobuf</module>
     <module>modules/json</module>
+    <module>modules/protobuf</module>
+    <!--module>modules/kafka</module>
+    <module>modules/riemann</module>
+    <module>modules/carbon</module-->
   </modules>
 
   <licenses>
@@ -49,10 +50,11 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <skip.findbugs>true</skip.findbugs>
-    <guice.version>4.0-beta5</guice.version>
+    <dagger.version>2.5</dagger.version>
     <tiny-async.version>1.5.0</tiny-async.version>
     <log4j.version>2.2</log4j.version>
     <slf4j.version>1.7.10</slf4j.version>
+    <jackson.version>2.7.4</jackson.version>
   </properties>
 
   <profiles>
@@ -146,6 +148,14 @@
     </profile>
   </profiles>
 
+  <dependencies>
+    <dependency>
+      <groupId>com.google.dagger</groupId>
+      <artifactId>dagger-compiler</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -202,17 +212,22 @@
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>2.5.0</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.dataformat</groupId>
         <artifactId>jackson-dataformat-yaml</artifactId>
-        <version>2.5.0</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <version>2.5.0</version>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jdk8</artifactId>
+        <version>${jackson.version}</version>
       </dependency>
 
       <dependency>
@@ -241,18 +256,19 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>18.0</version>
+        <version>19.0</version>
       </dependency>
 
       <dependency>
-        <groupId>com.google.inject</groupId>
-        <artifactId>guice</artifactId>
-        <version>${guice.version}</version>
+        <groupId>com.google.dagger</groupId>
+        <artifactId>dagger</artifactId>
+        <version>${dagger.version}</version>
       </dependency>
+
       <dependency>
-        <groupId>com.google.inject.extensions</groupId>
-        <artifactId>guice-multibindings</artifactId>
-        <version>${guice.version}</version>
+        <groupId>com.google.dagger</groupId>
+        <artifactId>dagger-compiler</artifactId>
+        <version>${dagger.version}</version>
       </dependency>
 
       <dependency>

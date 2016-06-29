@@ -17,14 +17,7 @@ package com.spotify.ffwd.debug;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.Scopes;
-import com.spotify.ffwd.output.BatchedPluginSink;
-import com.spotify.ffwd.output.FlushingPluginSink;
 import com.spotify.ffwd.output.OutputPlugin;
-import com.spotify.ffwd.output.OutputPluginModule;
-import com.spotify.ffwd.output.PluginSink;
 
 public class DebugOutputPlugin implements OutputPlugin {
     private final Long flushInterval;
@@ -34,6 +27,12 @@ public class DebugOutputPlugin implements OutputPlugin {
         this.flushInterval = flushInterval;
     }
 
+    @Override
+    public Exposed setup(final Depends depends) {
+        return DaggerDebugOutputPluginComponent.builder().build();
+    }
+
+    /*
     @Override
     public Module module(final Key<PluginSink> key, final String id) {
         return new OutputPluginModule(id) {
@@ -50,9 +49,5 @@ public class DebugOutputPlugin implements OutputPlugin {
             }
         };
     }
-
-    @Override
-    public String id(int index) {
-        return Integer.toString(index);
-    }
+    */
 }

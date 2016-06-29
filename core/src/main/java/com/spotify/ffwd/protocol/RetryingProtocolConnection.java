@@ -131,7 +131,7 @@ public class RetryingProtocolConnection implements ProtocolConnection {
             c = channel.getAndSet(null);
 
             if (c == null) {
-                return async.resolved(null);
+                return async.resolved();
             }
         }
 

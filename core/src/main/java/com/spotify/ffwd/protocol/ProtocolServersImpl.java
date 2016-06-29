@@ -15,8 +15,6 @@
  **/
 package com.spotify.ffwd.protocol;
 
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import io.netty.bootstrap.Bootstrap;
@@ -29,20 +27,25 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.Timer;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
 public class ProtocolServersImpl implements ProtocolServers {
-    @Inject
-    private AsyncFramework async;
+    private final AsyncFramework async;
+    private final EventLoopGroup boss;
+    private final EventLoopGroup worker;
+    private final Timer timer;
 
     @Inject
-    @Named("boss")
-    private EventLoopGroup boss;
-
-    @Inject
-    @Named("worker")
-    private EventLoopGroup worker;
-
-    @Inject
-    private Timer timer;
+    public ProtocolServersImpl(
+        AsyncFramework async, @Named("worker") EventLoopGroup worker,
+        @Named("boss") EventLoopGroup boss, Timer timer
+    ) {
+        this.async = async;
+        this.worker = worker;
+        this.boss = boss;
+        this.timer = timer;
+    }
 
     @Override
     public AsyncFuture<ProtocolConnection> bind(
@@ -70,9 +73,7 @@ public class ProtocolServersImpl implements ProtocolServers {
 
         b.option(ChannelOption.SO_BACKLOG, 128);
 
-        if (protocol.getReceiveBufferSize() != null) {
-            b.childOption(ChannelOption.SO_RCVBUF, protocol.getReceiveBufferSize());
-        }
+        protocol.getReceiveBufferSize().ifPresent(r -> b.childOption(ChannelOption.SO_RCVBUF, r));
 
         b.childOption(ChannelOption.SO_KEEPALIVE, true);
 
@@ -104,9 +105,9 @@ public class ProtocolServersImpl implements ProtocolServers {
         b.channel(NioDatagramChannel.class);
         b.handler(server.initializer());
 
-        if (protocol.getReceiveBufferSize() != null) {
-            b.option(ChannelOption.SO_RCVBUF, protocol.getReceiveBufferSize());
-        }
+        protocol.getReceiveBufferSize().ifPresent(r -> {
+            b.option(ChannelOption.SO_RCVBUF, r);
+        });
 
         final String host = protocol.getAddress().getHostString();
         final int port = protocol.getAddress().getPort();

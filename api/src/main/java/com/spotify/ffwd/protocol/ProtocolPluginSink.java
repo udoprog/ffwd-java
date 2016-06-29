@@ -15,45 +15,40 @@
  **/
 package com.spotify.ffwd.protocol;
 
-import com.google.common.collect.ImmutableList;
-import com.google.inject.Inject;
-import com.spotify.ffwd.filter.Filter;
-import com.spotify.ffwd.filter.TrueFilter;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import com.spotify.ffwd.output.BatchedPluginSink;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import eu.toolchain.async.LazyTransform;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicReference;
 
-@RequiredArgsConstructor
 public class ProtocolPluginSink implements BatchedPluginSink {
-    @Inject
-    private AsyncFramework async;
+    private final AtomicReference<ProtocolConnection> connection = new AtomicReference<>();
 
-    @Inject
-    private ProtocolClients clients;
-
-    @Inject
-    private Protocol protocol;
-
-    @Inject
-    private ProtocolClient client;
-
-    @Inject
-    private Logger log;
-
-    @Inject(optional = true)
-    private Filter filter = null;
-
+    private final AsyncFramework async;
+    private final ProtocolClients clients;
+    private final Protocol protocol;
+    private final ProtocolClient client;
+    private final Logger log;
     private final RetryPolicy retry;
 
-    private final AtomicReference<ProtocolConnection> connection = new AtomicReference<>();
+    @Inject
+    public ProtocolPluginSink(
+        final AsyncFramework async, final ProtocolClients clients, final Protocol protocol,
+        final ProtocolClient client, final Logger log, final RetryPolicy retry
+    ) {
+        this.async = async;
+        this.clients = clients;
+        this.protocol = protocol;
+        this.client = client;
+        this.log = log;
+        this.retry = retry;
+    }
 
     @Override
     public void init() {
@@ -64,10 +59,6 @@ public class ProtocolPluginSink implements BatchedPluginSink {
         final ProtocolConnection c = connection.get();
 
         if (c == null) {
-            return;
-        }
-
-        if (filter != null && !filter.matchesEvent(event)) {
             return;
         }
 
@@ -82,10 +73,6 @@ public class ProtocolPluginSink implements BatchedPluginSink {
             return;
         }
 
-        if (filter != null && !filter.matchesMetric(metric)) {
-            return;
-        }
-
         c.send(metric);
     }
 
@@ -97,7 +84,7 @@ public class ProtocolPluginSink implements BatchedPluginSink {
             return async.failed(new IllegalStateException("not connected to " + protocol));
         }
 
-        return c.sendAll(filterEvents(events));
+        return c.sendAll(events);
     }
 
     @Override
@@ -108,39 +95,7 @@ public class ProtocolPluginSink implements BatchedPluginSink {
             return async.failed(new IllegalStateException("not connected to " + protocol));
         }
 
-        return c.sendAll(filterMetrics(metrics));
-    }
-
-    public Collection<Event> filterEvents(Collection<Event> input) {
-        if (filter == null || filter instanceof TrueFilter) {
-            return input;
-        }
-
-        final ImmutableList.Builder<Event> output = ImmutableList.builder();
-
-        for (final Event e : input) {
-            if (filter.matchesEvent(e)) {
-                output.add(e);
-            }
-        }
-
-        return output.build();
-    }
-
-    public Collection<Metric> filterMetrics(Collection<Metric> input) {
-        if (filter == null || filter instanceof TrueFilter) {
-            return input;
-        }
-
-        final ImmutableList.Builder<Metric> output = ImmutableList.builder();
-
-        for (final Metric m : input) {
-            if (filter.matchesMetric(m)) {
-                output.add(m);
-            }
-        }
-
-        return output.build();
+        return c.sendAll(metrics);
     }
 
     @Override

@@ -20,11 +20,11 @@ import com.spotify.ffwd.model.Metric;
 import eu.toolchain.async.AsyncFuture;
 
 public interface DebugServer {
-    public void inspectEvent(String id, Event event);
+    void inspectEvent(String id, Event event);
 
-    public void inspectMetric(String id, Metric metric);
+    void inspectMetric(String id, Metric metric);
 
-    public AsyncFuture<Void> start();
+    AsyncFuture<Void> start();
 
-    public AsyncFuture<Void> stop();
+    AsyncFuture<Void> stop();
 }

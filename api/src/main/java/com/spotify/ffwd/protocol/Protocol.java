@@ -18,12 +18,13 @@ package com.spotify.ffwd.protocol;
 import lombok.Data;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 @Data
 public class Protocol {
     private final ProtocolType type;
     private final InetSocketAddress address;
-    private final Integer receiveBufferSize;
+    private final Optional<Integer> receiveBufferSize;
 
     @Override
     public String toString() {

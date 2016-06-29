@@ -19,7 +19,7 @@ import eu.toolchain.async.AsyncFuture;
 import org.slf4j.Logger;
 
 public interface ProtocolServers {
-    public AsyncFuture<ProtocolConnection> bind(
+    AsyncFuture<ProtocolConnection> bind(
         Logger log, Protocol protocol, ProtocolServer server, RetryPolicy policy
     );
 }

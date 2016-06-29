@@ -22,6 +22,7 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.Scopes;
+import com.spotify.ffwd.CoreDependencies;
 import com.spotify.ffwd.input.InputPlugin;
 import com.spotify.ffwd.input.PluginSource;
 import com.spotify.ffwd.protocol.Protocol;
@@ -90,6 +91,11 @@ public class CarbonInputPlugin implements InputPlugin {
 
     private Class<? extends ProtocolServer> defaultProtocolServer() {
         return CarbonLineServer.class;
+    }
+
+    @Override
+    public Exposed setup(final CoreDependencies core) {
+
     }
 
     @Override

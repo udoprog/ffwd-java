@@ -17,8 +17,6 @@ package com.spotify.ffwd;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
 import com.spotify.ffwd.input.InputManagerModule;
 import com.spotify.ffwd.output.OutputManagerModule;
@@ -30,6 +28,8 @@ import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Data
 public class AgentConfig {
@@ -55,37 +55,28 @@ public class AgentConfig {
 
     @JsonCreator
     public AgentConfig(
-        @JsonProperty("debug") Debug debug, @JsonProperty("host") String host,
-        @JsonProperty("tags") Map<String, String> tags,
-        @JsonProperty("input") InputManagerModule input,
-        @JsonProperty("output") OutputManagerModule output,
-        @JsonProperty("asyncThreads") Integer asyncThreads,
-        @JsonProperty("schedulerThreads") Integer schedulerThreads,
-        @JsonProperty("bossThreads") Integer bossThreads,
-        @JsonProperty("workerThreads") Integer workerThreads, @JsonProperty("ttl") Long ttl,
-        @JsonProperty("qlog") String qlog
+        @JsonProperty("debug") Optional<Debug> debug, @JsonProperty("host") Optional<String> host,
+        @JsonProperty("attributes") Optional<Map<String, String>> attributes,
+        @JsonProperty("tags") Optional<Set<String>> tags,
+        @JsonProperty("input") Optional<InputManagerModule> input,
+        @JsonProperty("output") Optional<OutputManagerModule> output,
+        @JsonProperty("asyncThreads") Optional<Integer> asyncThreads,
+        @JsonProperty("schedulerThreads") Optional<Integer> schedulerThreads,
+        @JsonProperty("bossThreads") Optional<Integer> bossThreads,
+        @JsonProperty("workerThreads") Optional<Integer> workerThreads,
+        @JsonProperty("ttl") Optional<Long> ttl, @JsonProperty("qlog") Optional<String> qlog
     ) {
-        this.debug = Optional.fromNullable(debug);
-        this.host = Optional.fromNullable(host).or(this.defaultHostSupplier());
-        this.tags = Optional.fromNullable(tags).or(DEFAULT_TAGS);
-        this.input = Optional.fromNullable(input).or(InputManagerModule.supplyDefault());
-        this.output = Optional.fromNullable(output).or(OutputManagerModule.supplyDefault());
-        this.asyncThreads = Optional.fromNullable(asyncThreads).or(DEFAULT_ASYNC_THREADS);
-        this.schedulerThreads =
-            Optional.fromNullable(schedulerThreads).or(DEFAULT_SCHEDULER_THREADS);
-        this.bossThreads = Optional.fromNullable(bossThreads).or(DEFAULT_BOSS_THREADS);
-        this.workerThreads = Optional.fromNullable(workerThreads).or(DEFAULT_WORKER_THREADS);
-        this.ttl = Optional.fromNullable(ttl).or(0L);
-        this.qlog = Paths.get(Optional.fromNullable(qlog).or(DEFAULT_QLOG));
-    }
-
-    private Supplier<String> defaultHostSupplier() {
-        return new Supplier<String>() {
-            @Override
-            public String get() {
-                return buildDefaultHost();
-            }
-        };
+        this.debug = debug;
+        this.host = host.orElseGet(this::buildDefaultHost);
+        this.tags = attributes.orElse(DEFAULT_TAGS);
+        this.input = input.orElseGet(InputManagerModule.supplyDefault());
+        this.output = output.orElseGet(OutputManagerModule.supplyDefault());
+        this.asyncThreads = asyncThreads.orElse(DEFAULT_ASYNC_THREADS);
+        this.schedulerThreads = schedulerThreads.orElse(DEFAULT_SCHEDULER_THREADS);
+        this.bossThreads = workerThreads.orElse(DEFAULT_BOSS_THREADS);
+        this.workerThreads = workerThreads.orElse(DEFAULT_WORKER_THREADS);
+        this.ttl = ttl.orElse(0L);
+        this.qlog = Paths.get(qlog.orElse(DEFAULT_QLOG));
     }
 
     private String buildDefaultHost() {
@@ -104,13 +95,12 @@ public class AgentConfig {
         private final InetSocketAddress localAddress;
 
         @JsonCreator
-        public Debug(@JsonProperty("host") String host, @JsonProperty("port") Integer port) {
-            this.localAddress = buildLocalAddress(Optional.fromNullable(host).or(DEFAULT_HOST),
-                Optional.fromNullable(port).or(DEFAULT_PORT));
-        }
-
-        private InetSocketAddress buildLocalAddress(String host, Integer port) {
-            return new InetSocketAddress(host, port);
+        public Debug(
+            @JsonProperty("host") Optional<String> host,
+            @JsonProperty("port") Optional<Integer> port
+        ) {
+            this.localAddress =
+                new InetSocketAddress(host.orElse(DEFAULT_HOST), port.orElse(DEFAULT_PORT));
         }
     }
 }

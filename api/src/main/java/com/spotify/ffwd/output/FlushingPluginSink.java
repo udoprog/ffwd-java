@@ -15,8 +15,6 @@
  **/
 package com.spotify.ffwd.output;
 
-import com.google.inject.Inject;
-import com.spotify.ffwd.filter.Filter;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import com.spotify.ffwd.statistics.OutputPluginStatistics;
@@ -28,7 +26,7 @@ import eu.toolchain.async.Transform;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
-import javax.inject.Named;
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -41,35 +39,59 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Facade implementation of a plugin sink that receives metrics and events, puts them on a
- * buffer, then flushes them at
- * regular intervals.
+ * Facade implementation of a plugin sink that receives metrics and events, puts them on a buffer,
+ * then flushes them at regular intervals.
  *
  * @author udoprog
  */
-@RequiredArgsConstructor
 public class FlushingPluginSink implements PluginSink {
+    public static final long DEFAULT_FLUSH_INTERVAL = 1000;
     public static final long DEFAULT_BATCH_SIZE_LIMIT = 10000;
     public static final long DEFAULT_MAX_PENDING_FLUSHES = 10;
 
-    @Inject
-    AsyncFramework async;
+    private final AsyncFramework async;
+    private final BatchedPluginSink sink;
+    private final ScheduledExecutorService scheduler;
+    private final Logger log;
+    private final OutputPluginStatistics statistics;
+
+    /**
+     * The default flush interval in milliseconds.
+     * <p>
+     * Flushes will not be scheduled if this value is lower than, or equal to {@code 0}.
+     */
+    private final long flushInterval;
+
+    /**
+     * Max size of each batch.
+     * <p>
+     * A size limit will not be imposed if this value is lower than, or equal to {@code 0}.
+     */
+    private final long batchSizeLimit;
+
+    /**
+     * Max number of pending flushes allowed.
+     * <p>
+     * A pending flush limit will not be imposed if this value is lower than, or equal to {@code
+     * 0}.
+     */
+    private final long maxPendingFlushes;
 
     @Inject
-    BatchedPluginSink sink;
+    public FlushingPluginSink(
+        AsyncFramework async, BatchedPluginSink sink, ScheduledExecutorService scheduler,
+        Logger log, OutputPluginStatistics statistics, FlushConfig config
+    ) {
+        this.async = async;
+        this.sink = sink;
+        this.scheduler = scheduler;
+        this.log = log;
+        this.statistics = statistics;
 
-    @Inject
-    ScheduledExecutorService scheduler;
-
-    @Inject
-    Logger log;
-
-    @Inject
-    OutputPluginStatistics statistics;
-
-    @Named("flushing")
-    @Inject(optional = true)
-    Filter filter = null;
+        this.flushInterval = config.getFlushInterval().orElse(DEFAULT_FLUSH_INTERVAL);
+        this.batchSizeLimit = config.getBatchSizeLimit().orElse(DEFAULT_BATCH_SIZE_LIMIT);
+        this.maxPendingFlushes = config.getMaxPendingFlushes().orElse(DEFAULT_MAX_PENDING_FLUSHES);
+    }
 
     /**
      * future associated with the timing of the next flush
@@ -87,8 +109,8 @@ public class FlushingPluginSink implements PluginSink {
 
     /**
      * lock that governs access to the pending set of futures, this is preferred over eventually
-     * consistent concurrent
-     * data structures since we desire a clean shutdown that tracks _all_ pending flushes.
+     * consistent concurrent data structures since we desire a clean shutdown that tracks _all_
+     * pending flushes.
      */
     final Object pendingLock = new Object();
     /**
@@ -96,32 +118,7 @@ public class FlushingPluginSink implements PluginSink {
      */
     final Set<AsyncFuture<Void>> pending = new HashSet<>();
 
-    /**
-     * The default flush interval in milliseconds.
-     *
-     * Flushes will not be scheduled if this value is lower than, or equal to {@code 0}.
-     */
-    final long flushInterval;
-
-    /**
-     * Max size of each batch.
-     *
-     * A size limit will not be imposed if this value is lower than, or equal to {@code 0}.
-     */
-    final long batchSizeLimit;
-
-    /**
-     * Max number of pending flushes allowed.
-     *
-     * A pending flush limit will not be imposed if this value is lower than, or equal to {@code 0}.
-     */
-    final long maxPendingFlushes;
-
     volatile boolean stopped = false;
-
-    public FlushingPluginSink(long flushInterval) {
-        this(flushInterval, DEFAULT_BATCH_SIZE_LIMIT, DEFAULT_MAX_PENDING_FLUSHES);
-    }
 
     @Override
     public void init() {
@@ -129,10 +126,6 @@ public class FlushingPluginSink implements PluginSink {
 
     @Override
     public void sendMetric(final Metric metric) {
-        if (filter != null && !filter.matchesMetric(metric)) {
-            return;
-        }
-
         // shortcut: check before synchronized block.
         if (nextBatch == null) {
             // TODO: instrument dropped metric.
@@ -154,10 +147,6 @@ public class FlushingPluginSink implements PluginSink {
 
     @Override
     public void sendEvent(Event event) {
-        if (filter != null && !filter.matchesEvent(event)) {
-            return;
-        }
-
         // shortcut: check before synchronized block.
         if (nextBatch == null) {
             // TODO: instrument dropped metric.
@@ -192,8 +181,6 @@ public class FlushingPluginSink implements PluginSink {
 
     @Override
     public AsyncFuture<Void> start() {
-        log.info("Starting (Filter: {})", filter);
-
         return sink.start().transform(new Transform<Void, Void>() {
             @Override
             public Void transform(Void result) throws Exception {
@@ -253,7 +240,7 @@ public class FlushingPluginSink implements PluginSink {
 
     /**
      * Flushes the current batch and schedules the next one
-     *
+     * <p>
      * Maintains the set of pending tasks.
      */
     void flushNowThenScheduleNext() {
@@ -336,12 +323,11 @@ public class FlushingPluginSink implements PluginSink {
 
     /**
      * Perform a flush of the next batch.
-     *
+     * <p>
      * The given parameter will be set as the next batch.
      *
      * @param newBatch The next batch to flush, setting to {@code null} will cause all subsequent
-     * batches to be
-     *            rejected.
+     * batches to be rejected.
      * @return A future associated with the current flush, or {@code null} if we are stopping.
      */
     AsyncFuture<Void> doFlush(Batch newBatch) {
@@ -389,7 +375,7 @@ public class FlushingPluginSink implements PluginSink {
 
     /**
      * Build a new batch.
-     *
+     * <p>
      * This is primarily to make mocking easier.
      *
      * @return A new batch.

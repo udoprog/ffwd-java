@@ -15,17 +15,22 @@
  **/
 package com.spotify.ffwd.template;
 
-import com.google.inject.Inject;
 import com.spotify.ffwd.protocol.ProtocolClient;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.handler.codec.string.StringEncoder;
 
-public class TemplateOutputProtocolClient implements ProtocolClient {
-    @Inject
-    private TemplateOutputEncoder outputEncoder;
+import javax.inject.Inject;
 
+public class TemplateOutputProtocolClient implements ProtocolClient {
     private final StringEncoder stringEncoder = new StringEncoder();
+
+    private final TemplateOutputEncoder outputEncoder;
+
+    @Inject
+    public TemplateOutputProtocolClient(final TemplateOutputEncoder outputEncoder) {
+        this.outputEncoder = outputEncoder;
+    }
 
     @Override
     public ChannelInitializer<Channel> initializer() {

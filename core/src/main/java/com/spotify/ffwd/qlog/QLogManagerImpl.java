@@ -16,14 +16,14 @@
 package com.spotify.ffwd.qlog;
 
 import com.google.common.collect.Lists;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -70,11 +70,10 @@ public class QLogManagerImpl implements QLogManager {
     private ByteBuffer tail;
 
     @Inject
-    public QLogManagerImpl(@Named("path") final Path path, final AsyncFramework async) {
-        this(path, async, DEFAULT_MAX_LOG_SIZE);
-    }
-
-    public QLogManagerImpl(final Path path, final AsyncFramework async, int maxLogSize) {
+    public QLogManagerImpl(
+        @Named("path") final Path path, final AsyncFramework async,
+        @Named("maxLogSize") int maxLogSize
+    ) {
         if (maxLogSize < MINIMUM_MAX_LOG_SIZE) {
             throw new IllegalArgumentException("maxLogSize");
         }

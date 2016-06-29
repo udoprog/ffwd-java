@@ -15,15 +15,14 @@
  **/
 package com.spotify.ffwd.serializer;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import lombok.Data;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
 
@@ -31,9 +30,12 @@ import java.util.Map;
 public class Spotify100Serializer implements Serializer {
     public static final String SCHEMA_VERSION = "1.0.0";
 
+    private final ObjectMapper mapper;
+
     @Inject
-    @Named("application/json")
-    private ObjectMapper mapper;
+    public Spotify100Serializer(@Named("application/json") ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
 
     @Data
     public static class Spotify100Metric {
@@ -53,10 +55,6 @@ public class Spotify100Serializer implements Serializer {
         private final Long time;
         private final Map<String, String> attributes;
         private final Double value;
-    }
-
-    @JsonCreator
-    public Spotify100Serializer() {
     }
 
     @Override

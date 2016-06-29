@@ -15,15 +15,20 @@
  **/
 package com.spotify.ffwd.debug;
 
-import com.google.inject.Inject;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 
+import javax.inject.Inject;
+
 public class NoopDebugServer implements DebugServer {
+    private final AsyncFramework async;
+
     @Inject
-    private AsyncFramework async;
+    public NoopDebugServer(final AsyncFramework async) {
+        this.async = async;
+    }
 
     @Override
     public void inspectEvent(String id, Event event) {

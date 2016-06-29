@@ -15,8 +15,6 @@
  **/
 package com.spotify.ffwd.protocol;
 
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import io.netty.bootstrap.Bootstrap;
@@ -27,16 +25,22 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.Timer;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
 public class ProtocolClientsImpl implements ProtocolClients {
-    @Inject
-    private AsyncFramework async;
+    private final AsyncFramework async;
+    private final EventLoopGroup worker;
+    private final Timer timer;
 
     @Inject
-    @Named("worker")
-    private EventLoopGroup worker;
-
-    @Inject
-    private Timer timer;
+    public ProtocolClientsImpl(
+        AsyncFramework async, @Named("worker") EventLoopGroup worker, Timer timer
+    ) {
+        this.async = async;
+        this.worker = worker;
+        this.timer = timer;
+    }
 
     @Override
     public AsyncFuture<ProtocolConnection> connect(

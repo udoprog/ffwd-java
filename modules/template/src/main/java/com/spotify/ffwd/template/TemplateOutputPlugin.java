@@ -17,58 +17,75 @@ package com.spotify.ffwd.template;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
 import com.spotify.ffwd.output.OutputPlugin;
-import com.spotify.ffwd.output.PluginSink;
+import com.spotify.ffwd.output.OutputPluginScope;
 import com.spotify.ffwd.protocol.Protocol;
 import com.spotify.ffwd.protocol.ProtocolClient;
 import com.spotify.ffwd.protocol.ProtocolFactory;
-import com.spotify.ffwd.protocol.ProtocolPluginSink;
 import com.spotify.ffwd.protocol.ProtocolType;
 import com.spotify.ffwd.protocol.RetryPolicy;
+import dagger.Module;
+import dagger.Provides;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+
+@Slf4j
+@Module
 public class TemplateOutputPlugin implements OutputPlugin {
+    public static final String DEFAULT_ID = "template";
     private static final ProtocolType DEFAULT_PROTOCOL = ProtocolType.TCP;
     private static final int DEFAULT_PORT = 8910;
 
+    private final String id;
     private final Protocol protocol;
     private final RetryPolicy retry;
 
     @JsonCreator
     public TemplateOutputPlugin(
-        @JsonProperty("protocol") final ProtocolFactory protocol,
-        @JsonProperty("retry") final RetryPolicy retry
+        @JsonProperty("id") final Optional<String> id,
+        @JsonProperty("protocol") final Optional<ProtocolFactory> protocol,
+        @JsonProperty("retry") final Optional<RetryPolicy> retry
     ) {
-        this.protocol = Optional
-            .fromNullable(protocol)
-            .or(ProtocolFactory.defaultFor())
+        this.id = id.orElse(DEFAULT_ID);
+        this.protocol = protocol
+            .orElseGet(ProtocolFactory::defaultInstance)
             .protocol(DEFAULT_PROTOCOL, DEFAULT_PORT);
-        this.retry = Optional.fromNullable(retry).or(new RetryPolicy.Exponential());
+        this.retry = retry.orElseGet(RetryPolicy.Exponential::new);
+    }
+
+    @Provides
+    @OutputPluginScope
+    public Protocol protocol() {
+        return protocol;
+    }
+
+    @Provides
+    @OutputPluginScope
+    public RetryPolicy retry() {
+        return retry;
+    }
+
+    @Provides
+    @OutputPluginScope
+    public ProtocolClient client(TemplateOutputProtocolClient client) {
+        return client;
+    }
+
+    @Provides
+    @OutputPluginScope
+    public Logger log() {
+        return LoggerFactory.getLogger(log.getName() + "[" + id + "/" + protocol + "]");
     }
 
     @Override
-    public Module module(final Key<PluginSink> key, final String id) {
-        return new PrivateModule() {
-            @Override
-            protected void configure() {
-                bind(Logger.class).toInstance(LoggerFactory.getLogger(id));
-                bind(TemplateOutputEncoder.class).toInstance(new TemplateOutputEncoder());
-                bind(Protocol.class).toInstance(protocol);
-                bind(ProtocolClient.class).toInstance(new TemplateOutputProtocolClient());
-
-                bind(key).toInstance(new ProtocolPluginSink(retry));
-                expose(key);
-            }
-        };
-    }
-
-    @Override
-    public String id(int index) {
-        return protocol.toString();
+    public Exposed setup(final Depends depends) {
+        return DaggerTemplateOutputPluginComponent
+            .builder()
+            .coreDependencies(depends.core())
+            .templateOutputPlugin(this)
+            .build();
     }
 }

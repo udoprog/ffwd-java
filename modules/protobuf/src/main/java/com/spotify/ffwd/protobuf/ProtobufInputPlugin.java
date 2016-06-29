@@ -17,69 +17,73 @@ package com.spotify.ffwd.protobuf;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Optional;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.PrivateModule;
-import com.google.inject.Scopes;
 import com.spotify.ffwd.input.InputPlugin;
-import com.spotify.ffwd.input.PluginSource;
+import com.spotify.ffwd.input.InputPluginScope;
 import com.spotify.ffwd.protocol.Protocol;
 import com.spotify.ffwd.protocol.ProtocolFactory;
 import com.spotify.ffwd.protocol.ProtocolServer;
 import com.spotify.ffwd.protocol.ProtocolType;
 import com.spotify.ffwd.protocol.RetryPolicy;
+import dagger.Lazy;
+import dagger.Module;
+import dagger.Provides;
 
+import java.util.Optional;
+
+@Module
 public class ProtobufInputPlugin implements InputPlugin {
     private static final ProtocolType DEFAULT_PROTOCOL = ProtocolType.UDP;
     private static final int DEFAULT_PORT = 19091;
 
     private final Protocol protocol;
-    private final Class<? extends ProtocolServer> protocolServer;
     private final RetryPolicy retry;
 
     @JsonCreator
     public ProtobufInputPlugin(
-        @JsonProperty("protocol") ProtocolFactory protocol, @JsonProperty("retry") RetryPolicy retry
+        @JsonProperty("protocol") Optional<ProtocolFactory> protocol,
+        @JsonProperty("retry") Optional<RetryPolicy> retry
     ) {
-        this.protocol = Optional
-            .fromNullable(protocol)
-            .or(ProtocolFactory.defaultFor())
+        this.protocol = protocol
+            .orElseGet(ProtocolFactory::defaultInstance)
             .protocol(DEFAULT_PROTOCOL, DEFAULT_PORT);
-        this.protocolServer = parseProtocolServer();
-        this.retry = Optional.fromNullable(retry).or(new RetryPolicy.Exponential());
+        this.retry = retry.orElseGet(RetryPolicy.Exponential::new);
     }
 
-    private Class<? extends ProtocolServer> parseProtocolServer() {
+    @Provides
+    @InputPluginScope
+    public Protocol protocol() {
+        return protocol;
+    }
+
+    @Provides
+    @InputPluginScope
+    public RetryPolicy retry() {
+        return retry;
+    }
+
+    @Provides
+    @InputPluginScope
+    public ProtocolServer parseProtocolServer(
+        Lazy<ProtobufFrameProtocolServer> frame,
+        Lazy<ProtobufLengthPrefixedProtocolServer> lengthPrefixed
+    ) {
         if (protocol.getType() == ProtocolType.UDP) {
-            return ProtobufFrameProtocolServer.class;
+            return frame.get();
         }
 
         if (protocol.getType() == ProtocolType.TCP) {
-            return ProtobufLengthPrefixedProtocolServer.class;
+            return lengthPrefixed.get();
         }
 
         throw new IllegalArgumentException("Protocol not supported: " + protocol.getType());
     }
 
     @Override
-    public Module module(final Key<PluginSource> key, final String id) {
-        return new PrivateModule() {
-            @Override
-            protected void configure() {
-                bind(ProtocolServer.class).to(protocolServer).in(Scopes.SINGLETON);
-                bind(Protocol.class).toInstance(protocol);
-                bind(RetryPolicy.class).toInstance(retry);
-                bind(ProtobufDecoder.class).in(Scopes.SINGLETON);
-
-                bind(key).to(ProtobufPluginSource.class).in(Scopes.SINGLETON);
-                expose(key);
-            }
-        };
-    }
-
-    @Override
-    public String id(int index) {
-        return String.format("%s[%s]", getClass().getPackage().getName(), protocol.toString());
+    public Exposed setup(final Depends depends) {
+        return DaggerProtobufInputPluginComponent
+            .builder()
+            .coreDependencies(depends.core())
+            .protobufInputPlugin(this)
+            .build();
     }
 }

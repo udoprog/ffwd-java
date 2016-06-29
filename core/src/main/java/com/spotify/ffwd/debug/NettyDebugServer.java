@@ -17,8 +17,6 @@ package com.spotify.ffwd.debug;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import eu.toolchain.async.AsyncFramework;
@@ -38,16 +36,16 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
-@RequiredArgsConstructor
 @ToString(of = {"localAddress"})
 public class NettyDebugServer implements DebugServer {
     private static final String LINE_ENDING = "\n";
@@ -56,21 +54,23 @@ public class NettyDebugServer implements DebugServer {
     final AtomicReference<Channel> server = new AtomicReference<>();
 
     private final InetSocketAddress localAddress;
+    private final AsyncFramework async;
+    private final EventLoopGroup boss;
+    private final EventLoopGroup worker;
+    private final ObjectMapper mapper;
 
     @Inject
-    private AsyncFramework async;
-
-    @Inject
-    @Named("boss")
-    private EventLoopGroup boss;
-
-    @Inject
-    @Named("worker")
-    private EventLoopGroup worker;
-
-    @Inject
-    @Named("application/json")
-    private ObjectMapper mapper;
+    public NettyDebugServer(
+        @Named("localAddress") final InetSocketAddress localAddress, final AsyncFramework async,
+        @Named("boss") final EventLoopGroup boss, @Named("worker") final EventLoopGroup worker,
+        @Named("application/json") final ObjectMapper mapper
+    ) {
+        this.localAddress = localAddress;
+        this.async = async;
+        this.boss = boss;
+        this.worker = worker;
+        this.mapper = mapper;
+    }
 
     private final ChannelGroup connected = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
 

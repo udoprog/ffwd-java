@@ -17,18 +17,22 @@ package com.spotify.ffwd.module;
 
 import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import com.spotify.ffwd.input.InputPlugin;
 import com.spotify.ffwd.output.OutputPlugin;
 import com.spotify.ffwd.serializer.Serializer;
 import lombok.Data;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
 @Data
 public class PluginContextImpl implements PluginContext {
+    private final SimpleModule module;
+
     @Inject
-    @Named("application/yaml+config")
-    private SimpleModule module;
+    public PluginContextImpl(@Named("application/yaml+config") SimpleModule module) {
+        this.module = module;
+    }
 
     @Override
     public void registerInput(String name, Class<? extends InputPlugin> input) {

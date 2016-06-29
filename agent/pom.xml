@@ -28,6 +28,20 @@
     <!-- modules -->
     <dependency>
       <groupId>com.spotify.ffwd</groupId>
+      <artifactId>ffwd-module-template</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify.ffwd</groupId>
+      <artifactId>ffwd-module-json</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.spotify.ffwd</groupId>
+      <artifactId>ffwd-module-protobuf</artifactId>
+    </dependency>
+
+    <!--
+    <dependency>
+      <groupId>com.spotify.ffwd</groupId>
       <artifactId>ffwd-module-kafka</artifactId>
     </dependency>
     <dependency>
@@ -38,20 +52,7 @@
       <groupId>com.spotify.ffwd</groupId>
       <artifactId>ffwd-module-carbon</artifactId>
     </dependency>
-
-    <dependency>
-      <groupId>com.spotify.ffwd</groupId>
-      <artifactId>ffwd-module-protobuf</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.spotify.ffwd</groupId>
-      <artifactId>ffwd-module-json</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.spotify.ffwd</groupId>
-      <artifactId>ffwd-module-template</artifactId>
-    </dependency>
+    -->
 
     <!-- logging -->
     <dependency>

@@ -15,7 +15,6 @@
  **/
 package com.spotify.ffwd.debug;
 
-import com.google.inject.Inject;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import com.spotify.ffwd.output.BatchedPluginSink;
@@ -23,12 +22,17 @@ import eu.toolchain.async.AsyncFramework;
 import eu.toolchain.async.AsyncFuture;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import java.util.Collection;
 
 @Slf4j
 public class DebugPluginSink implements BatchedPluginSink {
+    private final AsyncFramework async;
+
     @Inject
-    private AsyncFramework async;
+    public DebugPluginSink(final AsyncFramework async) {
+        this.async = async;
+    }
 
     @Override
     public void init() {
@@ -52,7 +56,7 @@ public class DebugPluginSink implements BatchedPluginSink {
             log.info("E#{}: {}", i++, e);
         }
 
-        return async.resolved(null);
+        return async.resolved();
     }
 
     @Override
@@ -63,7 +67,7 @@ public class DebugPluginSink implements BatchedPluginSink {
             log.info("E#{}: {}", i++, m);
         }
 
-        return async.resolved(null);
+        return async.resolved();
     }
 
     @Override
