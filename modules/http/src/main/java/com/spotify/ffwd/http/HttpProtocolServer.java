@@ -18,12 +18,12 @@ package com.spotify.ffwd.http;
 import com.google.inject.Inject;
 import com.spotify.ffwd.protocol.ProtocolServer;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
@@ -50,33 +50,40 @@ public class HttpProtocolServer implements ProtocolServer {
         return new ChannelInitializer<Channel>() {
             @Override
             protected void initChannel(Channel ch) throws Exception {
-                final ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
+                final ChannelInboundHandlerAdapter exceptionHandler = new ChannelInboundHandlerAdapter() {
                     @Override
-                    public void exceptionCaught(final ChannelHandlerContext ctx,
-                                                final Throwable cause
+                    public void exceptionCaught(
+                        final ChannelHandlerContext ctx, final Throwable cause
                     ) throws Exception {
-                        log.error("Exception: ", cause);
-                        ctx.channel()
-                           .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
-                                                                      HttpResponseStatus
-                                                                          .INTERNAL_SERVER_ERROR))
-                           .addListener(new ChannelFutureListener() {
-                               @Override
-                               public void operationComplete(final ChannelFuture future)
-                                   throws Exception {
-                                   future.channel()
-                                         .close();
-                               }
-                           });
+                        if (cause instanceof BadRequest) {
+                            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST);
+                            return;
+                        }
+                        if (cause instanceof DecoderException) {
+                            exceptionCaught(ctx, cause.getCause());
+                            return;
+                        }
+
+                        log.error("error in pipeline: ", cause);
+                        sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR);
                     }
                 };
-                ch.pipeline()
-                  .addLast(new HttpRequestDecoder(), new HttpObjectAggregator(Integer.MAX_VALUE), decoder);
-                ch.pipeline()
-                  .addLast(new HttpResponseEncoder());
-                ch.pipeline()
-                  .addLast(handler);
+                ch
+                    .pipeline()
+                    .addLast(new HttpRequestDecoder(), new HttpObjectAggregator(Integer.MAX_VALUE),
+                        decoder, handler);
+                ch.pipeline().addLast(new HttpResponseEncoder());
+                ch.pipeline().addLast(exceptionHandler);
             }
         };
+    }
+
+    private void sendResponse(
+        final ChannelHandlerContext ctx, final HttpResponseStatus status
+    ) {
+        ctx
+            .channel()
+            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status))
+            .addListener((ChannelFutureListener) future -> future.channel().close());
     }
 }

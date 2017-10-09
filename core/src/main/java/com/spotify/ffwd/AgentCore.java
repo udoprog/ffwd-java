@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
@@ -66,8 +67,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timer;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -85,6 +84,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AgentCore {
@@ -185,7 +185,7 @@ public class AgentCore {
 
     /**
      * Setup early application Injector.
-     *
+     * <p>
      * The early injector is used by modules to configure the system.
      *
      * @throws Exception If something could not be set up.
@@ -320,7 +320,9 @@ public class AgentCore {
             @Provides
             @Named("application/json")
             public ObjectMapper jsonMapper() {
-                return new ObjectMapper();
+                final ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new Jdk8Module());
+                return mapper;
             }
 
             @Singleton

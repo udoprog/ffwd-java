@@ -22,6 +22,7 @@ import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.spotify.ffwd.debug.DebugServer;
 import com.spotify.ffwd.filter.Filter;
+import com.spotify.ffwd.model.Batch;
 import com.spotify.ffwd.model.Event;
 import com.spotify.ffwd.model.Metric;
 import com.spotify.ffwd.statistics.OutputManagerStatistics;
@@ -124,6 +125,21 @@ public class CoreOutputManager implements OutputManager {
     }
 
     @Override
+    public void sendBatch(Batch batch) {
+        statistics.reportSentMetrics(batch.getMetrics().size());
+
+        final Metric filtered = filter(metric);
+
+        debug.inspectMetric(DEBUG_ID, filtered);
+
+        for (final PluginSink s : sinks) {
+            if (s.isReady()) {
+                s.sendMetric(filtered);
+            }
+        }
+    }
+
+    @Override
     public AsyncFuture<Void> start() {
         final ArrayList<AsyncFuture<Void>> futures = Lists.newArrayList();
 
@@ -178,6 +194,17 @@ public class CoreOutputManager implements OutputManager {
 
         final Set<String> mergedRiemannTags = Sets.newHashSet(riemannTags);
         mergedRiemannTags.addAll(metric.getRiemannTags());
+
+        return new Metric(metric.getKey(), metric.getValue(), time, host, mergedRiemannTags,
+            mergedTags, metric.getProc());
+    }
+
+    /**
+     * Filter the provided Metric and complete fields.
+     */
+    private Batch filter(final Batch batch) {
+        final Map<String, String> mergedTags = selectTags(metric);
+        final String host = selectHost(metric);
 
         return new Metric(metric.getKey(), metric.getValue(), time, host, mergedRiemannTags,
             mergedTags, metric.getProc());

@@ -16,6 +16,7 @@
 package com.spotify.ffwd.http;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.spotify.ffwd.model.Batch;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -26,6 +27,7 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import javax.inject.Inject;
@@ -48,11 +50,15 @@ public class HttpDecoder extends MessageToMessageDecoder<FullHttpRequest> {
         final Batch batch;
         try (final InputStream inputStream = new ByteBufInputStream(in.content())) {
             batch = mapper.readValue(inputStream, Batch.class);
+        } catch(final IOException e) {
+            throw new BadRequest();
         }
 
         log.info("HttpRequest: {}", in.content());
         log.info("Batch: {}", batch);
 
+        out.add(batch);
+        
         ctx.channel()
            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK))
            .addListener(new ChannelFutureListener() {
