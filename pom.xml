@@ -173,6 +173,11 @@
       </dependency>
       <dependency>
         <groupId>com.spotify.ffwd</groupId>
+          <artifactId>ffwd-module-http</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.spotify.ffwd</groupId>
         <artifactId>ffwd-module-riemann</artifactId>
         <version>${project.version}</version>
       </dependency>
