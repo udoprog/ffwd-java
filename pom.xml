@@ -24,6 +24,7 @@
     <module>modules/protobuf</module>
     <module>modules/json</module>
     <module>modules/signalfx</module>
+    <module>modules/http</module>
   </modules>
 
   <licenses>
